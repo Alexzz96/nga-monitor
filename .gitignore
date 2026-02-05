@@ -1,0 +1,28 @@
+# NGA Monitor
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 数据文件（敏感信息）
+data/*.json
+data/*.db
+!data/.gitkeep
+
+# 日志
+logs/*.log
+!logs/.gitkeep
+
+# 环境变量
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store

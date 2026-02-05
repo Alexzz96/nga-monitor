@@ -1,0 +1,21 @@
+services:
+  nga-monitor:
+    build: .
+    container_name: nga-monitor
+    volumes:
+      # 持久化数据（SQLite + Storage State）
+      - ./data:/app/data
+      # 日志目录
+      - ./logs:/app/logs
+    environment:
+      # Discord Webhook URL（必须设置）
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      # NGA 登录状态（从宿主机复制）
+      - NGA_STORAGE_STATE=/app/data/storage_state.json
+      # 检查间隔（秒，默认 60）
+      - CHECK_INTERVAL=60
+      # 时区
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    ports:
+      - "12306:12306"
