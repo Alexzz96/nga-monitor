@@ -5,8 +5,12 @@ NGA 爬虫模块（异步版本）
 
 import re
 import json
+import asyncio
+import logging
 from datetime import datetime, timezone
 from playwright.async_api import async_playwright
+
+logger = logging.getLogger(__name__)
 
 class NgaCrawler:
     def __init__(self, storage_state_path):
@@ -54,6 +58,72 @@ class NgaCrawler:
                 await browser.close()
         
         return replies
+    
+    async def fetch_history(self, target_url, max_pages=25, delay=2, progress_callback=None):
+        """
+        抓取历史回复（多页）
+        
+        Args:
+            target_url: 基础 URL
+            max_pages: 最大抓取页数（每页20条）
+            delay: 每页间隔秒数
+            progress_callback: 进度回调函数 (page_num, total_pages, replies_count)
+            
+        Returns:
+            list: 所有回复列表
+        """
+        import asyncio
+        
+        all_replies = []
+        seen_pids = set()
+        
+        logger = __import__('logging').getLogger(__name__)
+        logger.info(f"[History] 开始抓取历史，目标: {max_pages} 页")
+        
+        for page_num in range(1, max_pages + 1):
+            # 构建分页 URL
+            page_url = target_url
+            if '?' in page_url:
+                page_url += f'&page={page_num}'
+            else:
+                page_url += f'?page={page_num}'
+            
+            logger.info(f"[History] 正在抓取第 {page_num}/{max_pages} 页: {page_url}")
+            
+            try:
+                replies = await self.fetch_replies(page_url)
+                
+                # 去重
+                new_count = 0
+                for reply in replies:
+                    pid = reply.get('pid')
+                    if pid and pid not in seen_pids:
+                        seen_pids.add(pid)
+                        all_replies.append(reply)
+                        new_count += 1
+                
+                logger.info(f"[History] 第 {page_num} 页抓取完成: {len(replies)} 条，新增 {new_count} 条")
+                
+                # 调用进度回调
+                if progress_callback:
+                    await progress_callback(page_num, max_pages, len(all_replies))
+                
+                # 如果一页都没有新数据，可能已到末尾
+                if len(replies) == 0:
+                    logger.info(f"[History] 第 {page_num} 页无数据，停止抓取")
+                    break
+                
+                # 延迟，避免被封
+                if page_num < max_pages:
+                    logger.debug(f"[History] 等待 {delay} 秒...")
+                    await asyncio.sleep(delay)
+                    
+            except Exception as e:
+                logger.error(f"[History] 第 {page_num} 页抓取失败: {e}")
+                continue
+        
+        logger.info(f"[History] 历史抓取完成，共 {len(all_replies)} 条回复")
+        return all_replies
     
     async def _extract_reply(self, row):
         """从行元素提取回复数据"""

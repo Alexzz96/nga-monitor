@@ -132,6 +132,116 @@ class DailySummary(Base):
             'new_count': self.new_count
         }
 
+
+class ReplyArchive(Base):
+    """回复存档 - 存储所有抓取到的回复内容"""
+    __tablename__ = 'reply_archives'
+    
+    id = Column(Integer, primary_key=True)
+    target_id = Column(Integer, ForeignKey('monitor_targets.id'), nullable=False, index=True)
+    pid = Column(String(50), nullable=False, index=True)
+    tid = Column(String(50), index=True)
+    topic_title = Column(String(300))
+    content_full = Column(Text)  # 完整回复内容
+    quote_content = Column(Text)  # 引用内容
+    main_content = Column(Text)   # 主内容
+    forum = Column(String(100))   # 版块
+    post_date = Column(String(50), index=True)  # 发帖时间（加索引用于AI分析筛选）
+    url = Column(String(500))     # 链接
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
+    
+    # 关联
+    target = relationship("MonitorTarget")
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'target_id': self.target_id,
+            'pid': self.pid,
+            'tid': self.tid,
+            'topic_title': self.topic_title,
+            'content_full': self.content_full,
+            'quote_content': self.quote_content,
+            'main_content': self.main_content,
+            'forum': self.forum,
+            'post_date': self.post_date,
+            'url': self.url,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class ArchiveTask(Base):
+    """归档任务追踪"""
+    __tablename__ = 'archive_tasks'
+    
+    id = Column(Integer, primary_key=True)
+    target_id = Column(Integer, ForeignKey('monitor_targets.id'), nullable=False, index=True)
+    status = Column(String(20), default='pending', index=True)  # pending/running/completed/failed
+    total_pages = Column(Integer, default=0)
+    completed_pages = Column(Integer, default=0)
+    total_replies = Column(Integer, default=0)
+    archived_count = Column(Integer, default=0)
+    skipped_count = Column(Integer, default=0)
+    error_message = Column(Text)
+    started_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime)
+    
+    # 关联
+    target = relationship("MonitorTarget")
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'target_id': self.target_id,
+            'target_name': self.target.name if self.target else None,
+            'status': self.status,
+            'total_pages': self.total_pages,
+            'completed_pages': self.completed_pages,
+            'total_replies': self.total_replies,
+            'archived_count': self.archived_count,
+            'skipped_count': self.skipped_count,
+            'error_message': self.error_message,
+            'started_at': self.started_at.isoformat() if self.started_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'progress_percent': round(self.completed_pages / self.total_pages * 100, 1) if self.total_pages > 0 else 0
+        }
+
+
+class AIAnalysisReport(Base):
+    """AI 分析报告"""
+    __tablename__ = 'ai_analysis_reports'
+    
+    id = Column(Integer, primary_key=True)
+    target_id = Column(Integer, ForeignKey('monitor_targets.id'), nullable=False, index=True)
+    analysis_type = Column(String(20), nullable=False, index=True)  # 'single' 或 'compare'
+    time_range = Column(String(20), nullable=False)  # 'week', 'month', 'all'
+    start_date = Column(String(10))  # YYYY-MM-DD
+    end_date = Column(String(10))    # YYYY-MM-DD
+    report_content = Column(Text)    # 完整报告内容
+    summary = Column(Text)           # 简短摘要
+    style_tags = Column(String(500)) # 风格标签，JSON 格式
+    keywords = Column(String(500))   # 关键词，JSON 格式
+    sentiment_score = Column(Integer)  # 情感分数 -100 到 100
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # 关联
+    target = relationship("MonitorTarget")
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'target_id': self.target_id,
+            'analysis_type': self.analysis_type,
+            'time_range': self.time_range,
+            'start_date': self.start_date,
+            'end_date': self.end_date,
+            'summary': self.summary,
+            'style_tags': self.style_tags,
+            'keywords': self.keywords,
+            'sentiment_score': self.sentiment_score,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
 class Config(Base):
     """系统配置"""
     __tablename__ = 'config'
@@ -156,6 +266,50 @@ class Config(Base):
         else:
             cfg = Config(key='discord_webhook', value=url)
             db.add(cfg)
+        db.commit()
+    
+    @staticmethod
+    def get_ai_config(db):
+        """获取 AI 配置"""
+        configs = db.query(Config).filter(Config.key.like('ai_%')).all()
+        result = {
+            'provider': 'kimi',
+            'base_url': 'https://api.moonshot.cn/v1',
+            'api_key': '',
+            'model': 'moonshot-v1-8k',
+            'system_prompt': '你是一位专业的投资行为分析师，擅长从论坛帖子中分析用户的投资风格、关注领域和行为特征。请用中文回答。',
+            'analysis_prompt': '''请分析以下用户 "{user_name}" 的投资风格和发言特征：
+
+{content}
+
+请从以下几个方面进行分析，并以 JSON 格式返回：
+{{
+    "summary": "100字以内的整体评价",
+    "investment_style": "投资风格（如：长线价值投资/短线波段操作/均衡配置等）",
+    "risk_preference": "风险偏好（保守/稳健/激进）",
+    "focus_areas": ["关注的板块1", "关注的板块2"],
+    "key_stocks": ["提及的股票/基金代码"],
+    "sentiment": "整体情绪倾向（乐观/中性/悲观）",
+    "characteristics": ["特点1", "特点2", "特点3"],
+    "recommendation": "对该用户的简要评价或建议"
+}}'''
+        }
+        for cfg in configs:
+            key = cfg.key.replace('ai_', '')
+            result[key] = cfg.value
+        return result
+    
+    @staticmethod
+    def set_ai_config(db, config: dict):
+        """设置 AI 配置"""
+        for key, value in config.items():
+            full_key = f'ai_{key}'
+            cfg = db.query(Config).filter(Config.key == full_key).first()
+            if cfg:
+                cfg.value = value
+            else:
+                cfg = Config(key=full_key, value=value)
+                db.add(cfg)
         db.commit()
 
 def init_db():

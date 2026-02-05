@@ -187,11 +187,33 @@
             align-items: center;
         }
         .flex-grow { flex: 1; }
+        .nav-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            background: #f8f9fa;
+            color: #555;
+            font-weight: 500;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .nav-btn:hover {
+            background: #e9ecef;
+        }
+        .nav-btn.active {
+            background: #3498db;
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📡 NGA Monitor - 监控管理</h1>
+        
+        <div class="nav" style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <a href="/" class="nav-btn active">📡 监控管理</a>
+            <a href="/ai" class="nav-btn">🤖 AI 分析</a>
+            <a href="/data" class="nav-btn">📊 数据管理</a>
+        </div>
         
         <div id="alert" class="alert hidden"></div>
         

@@ -4,7 +4,7 @@ Discord Webhook 发送模块
 """
 
 import re
-import requests
+import httpx
 from datetime import datetime, timezone
 
 # 预编译正则表达式
@@ -16,9 +16,9 @@ class DiscordSender:
     def __init__(self, webhook_url):
         self.webhook_url = webhook_url
     
-    def send_reply(self, reply):
+    async def send_reply(self, reply):
         """
-        发送回复到 Discord webhook
+        发送回复到 Discord webhook (异步)
         
         Args:
             reply: 回复数据字典（需包含分离的 quote_content 和 main_content）
@@ -60,14 +60,12 @@ class DiscordSender:
             target_name = reply.get('target_name', '')
             topic_title = reply.get('topic_title', '未知主题')
             
-            # 主内容放在 description（Windows 推送可见），用代码块包裹
+            # 主内容处理 - 限制长度并清理
             main_text = main_content[:900] if main_content else "无内容"
-            main_with_code = f"```\n{main_text}\n```"
             
             # 构建 Discord embed
             embed = {
-                "title": target_name[:256] if target_name else topic_title[:256],
-                "description": main_with_code[:4096],  # description 支持最多 4096 字符
+                "title": f"💬 {target_name[:250]}" if target_name else f"💬 {topic_title[:250]}",
                 "url": url,
                 "color": 0xe74c3c,
                 "fields": [],
@@ -77,7 +75,15 @@ class DiscordSender:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
-            # 次要信息区域（只保留主题图标）
+            # 正文放在单独的 field 中，使用代码块和粗体使其更显眼
+            # Discord 中 ``` 代码块会显示为等宽字体，视觉上更突出
+            embed["fields"].append({
+                "name": "📝 正文回复",
+                "value": f"```{main_text[:1000]}```"[:1024],
+                "inline": False
+            })
+            
+            # 次要信息区域
             info_parts = []
             info_parts.append(f"📌 **主题**\n{topic_title[:200]}")
             
@@ -113,15 +119,21 @@ class DiscordSender:
                         "inline": False
                     })
             
-            response = requests.post(
-                self.webhook_url,
-                json={"embeds": [embed]},
-                timeout=30,
-                headers={'Content-Type': 'application/json'}
-            )
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(
+                    self.webhook_url,
+                    json={"embeds": [embed]},
+                    headers={'Content-Type': 'application/json'}
+                )
             
             return response.status_code == 204
             
+        except httpx.TimeoutException:
+            print(f"发送 Discord webhook 超时")
+            return False
+        except httpx.RequestError as e:
+            print(f"发送 Discord webhook 请求失败: {e}")
+            return False
         except Exception as e:
             print(f"发送 Discord webhook 失败: {e}")
             return False

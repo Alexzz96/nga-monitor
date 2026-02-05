@@ -7,7 +7,7 @@ import os
 import logging
 from datetime import datetime, timezone
 
-from db.models import SessionLocal, MonitorTarget, SentRecord, Config
+from db.models import SessionLocal, MonitorTarget, SentRecord, Config, ReplyArchive, ArchiveTask
 from nga_crawler import NgaCrawler
 from discord_sender import DiscordSender
 
@@ -80,6 +80,10 @@ async def check_and_send(target_id, force=False):
                 new_pids = [r.get('pid', 'N/A') for r in new_replies]
                 logger.debug(f"[调试] 新回复 PID 列表: {new_pids}", extra={'target_uid': target.uid})
         
+        # 批量保存抓取到的回复到存档（用于AI分析）
+        archived_count = await _bulk_archive_replies(db, target.id, replies)
+        logger.debug(f"用户 {target.uid}: 已存档 {archived_count} 条回复", extra={'target_uid': target.uid})
+        
         if not new_replies:
             logger.info(f"用户 {target.uid}: 没有新回复", extra={'target_uid': target.uid})
             return {"success": True, "message": "没有新回复（都已发送过）", "replies_count": len(replies)}
@@ -94,7 +98,7 @@ async def check_and_send(target_id, force=False):
         latest = new_replies[0]
         latest['target_name'] = target.name or target.uid
         sender = DiscordSender(webhook)
-        success = sender.send_reply(latest)
+        success = await sender.send_reply(latest)
         
         record = SentRecord(
             target_id=target.id,
@@ -143,3 +147,246 @@ async def check_all_targets():
     
     logger.info("定时检查完成")
     return results
+
+
+async def archive_history_task(target_id: int, max_pages: int = 25):
+    """
+    后台任务：抓取用户历史回复并存档（带任务追踪）
+    
+    Args:
+        target_id: 监控目标 ID
+        max_pages: 最大抓取页数
+    """
+    db = SessionLocal()
+    task = None
+    
+    try:
+        # 检查是否有进行中的任务
+        existing_task = db.query(ArchiveTask).filter(
+            ArchiveTask.target_id == target_id,
+            ArchiveTask.status == 'running'
+        ).first()
+        
+        if existing_task:
+            logger.warning(f"[Archive Task] 目标 {target_id} 已有进行中的归档任务")
+            return
+        
+        # 创建任务记录
+        task = ArchiveTask(
+            target_id=target_id,
+            status='running',
+            total_pages=max_pages,
+            completed_pages=0
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        
+        logger.info(f"[Archive Task] 任务创建: ID={task.id}, target_id={target_id}, max_pages={max_pages}")
+        
+        target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+        if not target:
+            logger.error(f"[Archive Task] 目标不存在: {target_id}")
+            task.status = 'failed'
+            task.error_message = '目标不存在'
+            task.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            return
+        
+        logger.info(f"[Archive Task] 目标用户: {target.name} ({target.uid})")
+        
+        # 抓取历史，带进度回调
+        crawler = NgaCrawler(STORAGE_STATE_PATH)
+        
+        async def progress_callback(page_num, total_pages, replies_count):
+            """实时更新进度到数据库"""
+            task.completed_pages = page_num
+            task.total_replies = replies_count
+            db.commit()
+            logger.info(f"[Archive Task] 进度更新: {page_num}/{total_pages} 页, {replies_count} 条回复")
+        
+        replies = await crawler.fetch_history(
+            target.url, 
+            max_pages=max_pages, 
+            delay=2,
+            progress_callback=progress_callback
+        )
+        
+        task.total_replies = len(replies)
+        db.commit()
+        
+        if not replies:
+            logger.warning(f"[Archive Task] 未抓取到任何回复")
+            task.status = 'completed'
+            task.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            return
+        
+        logger.info(f"[Archive Task] 抓取完成，共 {len(replies)} 条，开始存档...")
+        
+        # 更新最终抓取数量
+        task.total_replies = len(replies)
+        db.commit()
+        
+        # 使用批量插入存档到数据库
+        archived_count, skipped_count = await _bulk_archive_replies_with_stats(db, target.id, replies)
+        
+        # 更新任务状态
+        task.status = 'completed'
+        task.completed_pages = max_pages
+        task.archived_count = archived_count
+        task.skipped_count = skipped_count
+        task.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        
+        logger.info(f"[Archive Task] 历史存档完成!")
+        logger.info(f"[Archive Task] 总计: {len(replies)} 条, 新增: {archived_count} 条, 跳过: {skipped_count} 条")
+        
+    except Exception as e:
+        logger.error(f"[Archive Task] 抓取历史失败: {e}", exc_info=True)
+        if task:
+            task.status = 'failed'
+            task.error_message = str(e)[:500]
+            task.completed_at = datetime.now(timezone.utc)
+            db.commit()
+    finally:
+        db.close()
+
+
+async def _bulk_archive_replies(db, target_id: int, replies: list) -> int:
+    """
+    批量存档回复到数据库
+    
+    Args:
+        db: 数据库会话
+        target_id: 目标用户ID
+        replies: 回复列表
+        
+    Returns:
+        int: 实际插入的新记录数
+    """
+    if not replies:
+        return 0
+    
+    try:
+        # 1. 批量查询所有已存在的PID（单次查询）
+        reply_pids = [r['pid'] for r in replies if r.get('pid')]
+        if not reply_pids:
+            logger.warning("[Bulk Archive] 没有有效的PID需要处理")
+            return 0
+        
+        existing_pids = {
+            row[0] for row in db.query(ReplyArchive.pid).filter(
+                ReplyArchive.pid.in_(reply_pids)
+            ).all()
+        }
+        
+        # 2. 过滤出需要插入的新记录
+        new_replies = [
+            r for r in replies 
+            if r.get('pid') and r['pid'] not in existing_pids
+        ]
+        
+        if not new_replies:
+            logger.debug(f"[Bulk Archive] 所有 {len(replies)} 条记录已存在，跳过插入")
+            return 0
+        
+        # 3. 准备批量插入的数据映射
+        archive_mappings = [
+            {
+                'target_id': target_id,
+                'pid': r['pid'],
+                'tid': r.get('tid', ''),
+                'topic_title': r.get('topic_title', ''),
+                'content_full': r.get('content_full', ''),
+                'quote_content': r.get('quote_content', ''),
+                'main_content': r.get('main_content', ''),
+                'forum': r.get('forum', ''),
+                'post_date': r.get('post_date', ''),
+                'url': r.get('url', '')
+            }
+            for r in new_replies
+        ]
+        
+        # 4. 使用SQLAlchemy批量插入
+        db.bulk_insert_mappings(ReplyArchive, archive_mappings)
+        db.commit()
+        
+        logger.info(f"[Bulk Archive] 批量插入完成: 新增 {len(new_replies)} 条, 跳过已存在 {len(existing_pids)} 条")
+        return len(new_replies)
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Bulk Archive] 批量存档失败: {e}", exc_info=True)
+        raise
+
+
+async def _bulk_archive_replies_with_stats(db, target_id: int, replies: list) -> tuple:
+    """
+    批量存档回复到数据库（返回统计信息版本）
+    
+    Args:
+        db: 数据库会话
+        target_id: 目标用户ID
+        replies: 回复列表
+        
+    Returns:
+        tuple: (插入数量, 跳过数量)
+    """
+    if not replies:
+        return 0, 0
+    
+    try:
+        # 1. 批量查询所有已存在的PID（单次查询）
+        reply_pids = [r['pid'] for r in replies if r.get('pid')]
+        if not reply_pids:
+            logger.warning("[Bulk Archive Stats] 没有有效的PID需要处理")
+            return 0, 0
+        
+        existing_pids = {
+            row[0] for row in db.query(ReplyArchive.pid).filter(
+                ReplyArchive.pid.in_(reply_pids)
+            ).all()
+        }
+        
+        # 2. 过滤出需要插入的新记录
+        new_replies = [
+            r for r in replies 
+            if r.get('pid') and r['pid'] not in existing_pids
+        ]
+        
+        skipped_count = len(replies) - len(new_replies)
+        
+        if not new_replies:
+            logger.info(f"[Bulk Archive Stats] 所有 {len(replies)} 条记录已存在，跳过插入")
+            return 0, skipped_count
+        
+        # 3. 准备批量插入的数据映射
+        archive_mappings = [
+            {
+                'target_id': target_id,
+                'pid': r['pid'],
+                'tid': r.get('tid', ''),
+                'topic_title': r.get('topic_title', ''),
+                'content_full': r.get('content_full', ''),
+                'quote_content': r.get('quote_content', ''),
+                'main_content': r.get('main_content', ''),
+                'forum': r.get('forum', ''),
+                'post_date': r.get('post_date', ''),
+                'url': r.get('url', '')
+            }
+            for r in new_replies
+        ]
+        
+        # 4. 使用SQLAlchemy批量插入（事务自动处理）
+        db.bulk_insert_mappings(ReplyArchive, archive_mappings)
+        db.commit()
+        
+        logger.info(f"[Bulk Archive Stats] 批量插入完成: 新增 {len(new_replies)} 条, 跳过已存在 {skipped_count} 条")
+        return len(new_replies), skipped_count
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Bulk Archive Stats] 批量存档失败: {e}", exc_info=True)
+        raise
+

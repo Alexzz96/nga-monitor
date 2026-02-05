@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGA Monitor - 数据管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .nav {
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #3498db;
+            text-decoration: none;
+            margin-right: 0;
+        }
+        .nav-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            background: #f8f9fa;
+            color: #555;
+            font-weight: 500;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .nav-btn:hover {
+            background: #e9ecef;
+        }
+        .nav-btn.active {
+            background: #3498db;
+            color: white;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #34495e;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            font-weight: 600;
+            color: #555;
+            background: #f8f9fa;
+        }
+        tr:hover { background: #f8f9fa; }
+        .badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .btn-secondary:hover { background: #7f8c8d; }
+        .btn-success { background: #27ae60; color: white; }
+        .btn-success:hover { background: #229954; }
+        .btn-warning { background: #f39c12; color: white; }
+        .btn-warning:hover { background: #e67e22; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; color: #555; }
+        select, input[type="text"], input[type="number"] {
+            width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;
+        }
+        select:focus, input:focus { outline: none; border-color: #3498db; }
+        .checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .checkbox-item {
+            display: flex; align-items: center; gap: 5px;
+            padding: 8px 12px; background: #f8f9fa; border-radius: 4px; cursor: pointer;
+        }
+        .checkbox-item:hover { background: #e9ecef; }
+        .checkbox-item input { cursor: pointer; }
+        .alert {
+            padding: 12px 15px; border-radius: 4px; margin-bottom: 15px;
+        }
+        .alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .alert-info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .hidden { display: none !important; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .progress-bar {
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 20px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            background: #3498db;
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow: auto;
+            width: 90%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 数据管理中心</h1>
+        
+        <div class="nav" style="display: flex; gap: 10px;">
+            <a href="/" class="nav-btn">📡 监控管理</a>
+            <a href="/ai" class="nav-btn">🤖 AI 分析</a>
+            <a href="/data" class="nav-btn active">📊 数据管理</a>
+        </div>
+        
+        <!-- 总体统计 -->
+        <div class="card">
+            <h2>📈 总体统计</h2>
+            <div class="stats-grid" id="overall-stats">
+                <div class="stat-card">
+                    <div class="stat-value" id="total-targets">-</div>
+                    <div class="stat-label">监控目标</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="total-archived">-</div>
+                    <div class="stat-label">已存档回复</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="total-sent">-</div>
+                    <div class="stat-label">已推送消息</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="db-size">-</div>
+                    <div class="stat-label">数据库大小</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 历史数据归档 -->
+        <div class="card">
+            <h2>📥 历史数据归档</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">抓取用户的历史回复并存档，用于 AI 分析。每页约 20 条回复。</p>
+            
+            <div class="form-group">
+                <label>选择要归档的用户</label>
+                <div class="checkbox-group" id="archive-targets">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>抓取页数（每页约20条）</label>
+                <select id="archive-pages">
+                    <option value="10">10页（约200条）</option>
+                    <option value="25" selected>25页（约500条）</option>
+                    <option value="50">50页（约1000条）</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="startArchive()">开始抓取历史</button>
+                <button class="btn btn-secondary" onclick="loadArchiveStatus()">查看归档状态</button>
+            </div>
+            
+            <div id="archive-status" style="margin-top: 15px;"></div>
+        </div>
+        
+        <!-- 用户归档详情 -->
+        <div class="card">
+            <h2>👤 用户归档详情</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>用户</th>
+                        <th>UID</th>
+                        <th>状态</th>
+                        <th>已存档</th>
+                        <th>已推送</th>
+                        <th>时间范围</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 数据库清理 -->
+        <div class="card">
+            <h2>🧹 数据库清理</h2>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">删除旧的归档数据以释放空间。</p>
+            
+            <div class="form-group">
+                <label>保留最近 N 天的数据</label>
+                <div style="display: flex; gap: 10px;">
+                    <select id="cleanup-days" style="width: 150px;">
+                        <option value="30">30 天</option>
+                        <option value="60">60 天</option>
+                        <option value="90" selected>90 天</option>
+                        <option value="180">180 天</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="previewCleanup()">预览</button>
+                    <button class="btn btn-warning" onclick="executeCleanup()" id="cleanup-btn" style="display: none;">确认删除</button>
+                </div>
+            </div>
+            
+            <div id="cleanup-preview"></div>
+        </div>
+        
+        <!-- 归档任务 -->
+        <div class="card">
+            <h2>⏳ 近期归档任务</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>用户</th>
+                        <th>状态</th>
+                        <th>进度</th>
+                        <th>抓取/存档</th>
+                        <th>开始时间</th>
+                    </tr>
+                </thead>
+                <tbody id="tasks-table">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- 用户详情弹窗 -->
+    <div class="modal" id="user-modal">
+        <div class="modal-content">
+            <h3 id="modal-title">用户详情</h3>
+            <div id="modal-content"></div>
+            <button class="btn btn-secondary" onclick="closeModal()" style="margin-top: 15px;">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            loadOverallStats();
+            loadUsersDetail();
+            loadRecentTasks();
+        });
+        
+        // 总体统计
+        async function loadOverallStats() {
+            try {
+                const [statsRes, archiveRes] = await Promise.all([
+                    fetch('/api/stats'),
+                    fetch('/api/archive/stats')
+                ]);
+                
+                const stats = await statsRes.json();
+                const archive = await archiveRes.json();
+                
+                document.getElementById('total-targets').textContent = stats.targets.total;
+                document.getElementById('total-sent').textContent = stats.sent.total;
+                document.getElementById('total-archived').textContent = archive.total_archived || 0;
+                document.getElementById('db-size').textContent = formatBytes(archive.db_size || 0);
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
+        }
+        
+        // 用户详情
+        async function loadUsersDetail() {
+            try {
+                const res = await fetch('/api/targets');
+                const data = await res.json();
+                
+                const tbody = document.getElementById('users-table');
+                const archiveContainer = document.getElementById('archive-targets');
+                tbody.innerHTML = '';
+                archiveContainer.innerHTML = '';
+                
+                for (const target of data.targets) {
+                    // 获取每个用户的归档状态
+                    const archiveRes = await fetch(`/api/archive/status/${target.id}`);
+                    const archive = await archiveRes.json();
+                    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${target.name || '-'}</strong></td>
+                        <td>${target.uid}</td>
+                        <td>
+                            <span class="badge ${target.enabled ? 'badge-success' : 'badge-warning'}">
+                                ${target.enabled ? '启用' : '禁用'}
+                            </span>
+                        </td>
+                        <td>${archive.total_archived || 0}</td>
+                        <td>-</td>
+                        <td>
+                            ${archive.earliest_post_date || '-'}<br>
+                            ~ ${archive.latest_post_date || '-'}
+                        </td>
+                        <td>
+                            <button class="btn btn-primary btn-sm" onclick="viewUserDetail(${target.id})">查看历史</button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                    
+                    // 归档目标选择
+                    const label = document.createElement('label');
+                    label.className = 'checkbox-item';
+                    label.innerHTML = `
+                        <input type="radio" name="archive-target" value="${target.id}" data-name="${target.name}">
+                        <span>${target.name || target.uid}</span>
+                    `;
+                    archiveContainer.appendChild(label);
+                }
+            } catch (e) {
+                console.error('加载用户详情失败:', e);
+            }
+        }
+        
+        // 历史归档功能
+        async function startArchive() {
+            const selected = document.querySelector('input[name="archive-target"]:checked');
+            if (!selected) {
+                alert('请选择一个要归档的用户');
+                return;
+            }
+            
+            const targetId = parseInt(selected.value);
+            const maxPages = parseInt(document.getElementById('archive-pages').value);
+            
+            if (!confirm(`确定要抓取 ${maxPages} 页历史数据吗？这将耗时约 ${maxPages * 2} 秒。`)) {
+                return;
+            }
+            
+            document.getElementById('archive-status').innerHTML = `
+                <div class="alert alert-info">
+                    <strong>⏳ 抓取进行中...</strong><br>
+                    正在后台抓取 ${maxPages} 页历史数据。<br>
+                    每页间隔 2 秒，预计耗时 ${maxPages * 2} 秒。
+                </div>
+            `;
+            
+            try {
+                const res = await fetch(`/api/archive/history/${targetId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({max_pages: maxPages})
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    setTimeout(loadArchiveStatus, 1000);
+                } else {
+                    alert(data.detail || '启动失败');
+                    document.getElementById('archive-status').innerHTML = '';
+                }
+            } catch (e) {
+                alert('请求失败');
+                document.getElementById('archive-status').innerHTML = '';
+            }
+        }
+        
+        async function loadArchiveStatus() {
+            const selected = document.querySelector('input[name="archive-target"]:checked');
+            if (!selected) {
+                document.getElementById('archive-status').innerHTML = '<p style="color: #666;">请先选择一个用户</p>';
+                return;
+            }
+            
+            const targetId = parseInt(selected.value);
+            
+            try {
+                const res = await fetch(`/api/archive/status/${targetId}`);
+                const data = await res.json();
+                
+                if (res.ok) {
+                    let html = `
+                        <div class="alert alert-success">
+                            <strong>📊 ${data.target_name} 的归档状态</strong><br>
+                            已存档: <strong>${data.total_archived}</strong> 条回复<br>
+                            最新回复: ${data.latest_post_date || '无'}<br>
+                            最早回复: ${data.earliest_post_date || '无'}
+                    `;
+                    
+                    if (data.running_task) {
+                        const progress = data.running_task.progress_percent;
+                        html += `
+                            <hr style="margin: 10px 0;">
+                            <strong>⏳ 正在抓取中...</strong><br>
+                            进度: ${data.running_task.completed_pages}/${data.running_task.total_pages} 页 (${progress}%)<br>
+                            已获取: ${data.running_task.total_replies} 条回复<br>
+                            <div class="progress-bar" style="margin-top: 5px;">
+                                <div class="progress-fill" style="width: ${progress}%;"></div>
+                            </div>
+                        `;
+                    }
+                    
+                    html += '</div>';
+                    document.getElementById('archive-status').innerHTML = html;
+                    
+                    if (data.running_task) {
+                        setTimeout(loadArchiveStatus, 1000);
+                    }
+                }
+            } catch (e) {
+                console.error('获取状态失败:', e);
+            }
+        }
+        
+        // 近期任务
+        async function loadRecentTasks() {
+            try {
+                const res = await fetch('/api/archive/tasks?limit=10');
+                const data = await res.json();
+                
+                const tbody = document.getElementById('tasks-table');
+                tbody.innerHTML = '';
+                
+                if (data.tasks.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #666;">暂无任务</td></tr>';
+                    return;
+                }
+                
+                for (const task of data.tasks) {
+                    const row = document.createElement('tr');
+                    const statusBadge = {
+                        'running': '<span class="badge badge-success">进行中</span>',
+                        'completed': '<span class="badge badge-success">已完成</span>',
+                        'failed': '<span class="badge badge-warning">失败</span>',
+                        'pending': '<span class="badge badge-warning">等待中</span>'
+                    }[task.status] || task.status;
+                    
+                    row.innerHTML = `
+                        <td>${task.target_name || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${task.progress_percent}%"></div>
+                            </div>
+                            ${task.progress_percent}%
+                        </td>
+                        <td>${task.total_replies} / ${task.archived_count}</td>
+                        <td>${new Date(task.started_at).toLocaleString()}</td>
+                    `;
+                    tbody.appendChild(row);
+                }
+                
+                // 如果有进行中的任务，自动刷新（每秒）
+                if (data.tasks.some(t => t.status === 'running')) {
+                    setTimeout(loadRecentTasks, 1000);
+                }
+            } catch (e) {
+                console.error('加载任务失败:', e);
+            }
+        }
+        
+        // 查看用户详情（显示历史回复列表）
+        let currentHistoryPage = 1;
+        let currentTargetId = null;
+        
+        async function viewUserDetail(targetId) {
+            currentTargetId = targetId;
+            currentHistoryPage = 1;
+            
+            try {
+                const [targetRes, archiveRes] = await Promise.all([
+                    fetch(`/api/targets`),
+                    fetch(`/api/archive/status/${targetId}`)
+                ]);
+                
+                const targets = await targetRes.json();
+                const archive = await archiveRes.json();
+                const target = targets.targets.find(t => t.id === targetId);
+                
+                document.getElementById('modal-title').textContent = `${target.name} 的历史回复`;
+                document.getElementById('modal-content').innerHTML = `
+                    <div style="margin-bottom: 15px;">
+                        <p><strong>UID:</strong> ${target.uid} | <strong>已存档:</strong> ${archive.total_archived} 条</p>
+                    </div>
+                    <div id="history-list" style="max-height: 400px; overflow-y: auto;">
+                        <p>加载中...</p>
+                    </div>
+                    <div id="history-pagination" style="margin-top: 15px; text-align: center;">
+                    </div>
+                `;
+                
+                document.getElementById('user-modal').classList.add('active');
+                await loadUserHistory(targetId, 1);
+            } catch (e) {
+                console.error('加载详情失败:', e);
+            }
+        }
+        
+        async function loadUserHistory(targetId, page) {
+            currentHistoryPage = page;
+            const limit = 10;
+            
+            try {
+                const res = await fetch(`/api/archive/history/${targetId}?page=${page}&limit=${limit}`);
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    document.getElementById('history-list').innerHTML = `<p style="color: #e74c3c;">加载失败: ${data.detail}</p>`;
+                    return;
+                }
+                
+                const historyList = document.getElementById('history-list');
+                
+                if (data.records.length === 0) {
+                    historyList.innerHTML = '<p style="text-align: center; color: #666;">暂无历史回复</p>';
+                    return;
+                }
+                
+                let html = '';
+                for (const record of data.records) {
+                    html += `
+                        <div style="border: 1px solid #eee; border-radius: 4px; padding: 12px; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <a href="${record.url}" target="_blank" style="color: #3498db; font-weight: bold; text-decoration: none;">
+                                    📌 ${record.topic_title || '无标题'}
+                                </a>
+                                <span style="color: #666; font-size: 12px;">${record.post_date || '-'}</span>
+                            </div>
+                            ${record.quote_content ? `<div style="background: #f8f9fa; padding: 8px; border-radius: 4px; margin-bottom: 8px; font-size: 13px; color: #666;">
+                                <em>引用: ${record.quote_content.substring(0, 100)}${record.quote_content.length > 100 ? '...' : ''}</em>
+                            </div>` : ''}
+                            <div style="font-size: 14px; line-height: 1.6;">${record.main_content || record.content_full || '无内容'}</div>
+                            <div style="margin-top: 8px; font-size: 12px; color: #999;">
+                                PID: ${record.pid} | 版块: ${record.forum || '-'}
+                            </div>
+                        </div>
+                    `;
+                }
+                historyList.innerHTML = html;
+                
+                // 分页
+                const totalPages = Math.ceil(data.total / limit);
+                let paginationHtml = '';
+                if (totalPages > 1) {
+                    paginationHtml += `
+                        <button class="btn btn-sm ${page === 1 ? 'btn-secondary' : 'btn-primary'}" 
+                            onclick="loadUserHistory(${targetId}, ${page - 1})" 
+                            ${page === 1 ? 'disabled' : ''}>上一页</button>
+                        <span style="margin: 0 10px;">${page} / ${totalPages}</span>
+                        <button class="btn btn-sm ${page === totalPages ? 'btn-secondary' : 'btn-primary'}" 
+                            onclick="loadUserHistory(${targetId}, ${page + 1})" 
+                            ${page === totalPages ? 'disabled' : ''}>下一页</button>
+                    `;
+                }
+                document.getElementById('history-pagination').innerHTML = paginationHtml;
+                
+            } catch (e) {
+                document.getElementById('history-list').innerHTML = `<p style="color: #e74c3c;">加载失败: ${e.message}</p>`;
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('user-modal').classList.remove('active');
+        }
+        
+        // 数据库清理
+        let cleanupPreviewData = null;
+        
+        async function previewCleanup() {
+            const days = parseInt(document.getElementById('cleanup-days').value);
+            
+            try {
+                const res = await fetch('/api/archive/cleanup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({days: days, dry_run: true})
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    cleanupPreviewData = {days, would_delete: data.would_delete};
+                    
+                    document.getElementById('cleanup-preview').innerHTML = `
+                        <div class="alert alert-info">
+                            <strong>📋 清理预览</strong><br>
+                            将删除 <strong>${data.would_delete}</strong> 条记录（${days} 天前）<br>
+                            截止时间: ${new Date(data.cutoff_date).toLocaleString()}
+                        </div>
+                    `;
+                    
+                    document.getElementById('cleanup-btn').style.display = 'inline-block';
+                } else {
+                    alert(data.detail || '预览失败');
+                }
+            } catch (e) {
+                alert('请求失败');
+            }
+        }
+        
+        async function executeCleanup() {
+            if (!cleanupPreviewData) {
+                alert('请先预览');
+                return;
+            }
+            
+            if (!confirm(`确定要删除 ${cleanupPreviewData.would_delete} 条旧记录吗？此操作不可恢复！`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/archive/cleanup', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({days: cleanupPreviewData.days, dry_run: false})
+                });
+                
+                const data = await res.json();
+                
+                if (res.ok) {
+                    alert(`已删除 ${data.deleted} 条旧记录`);
+                    document.getElementById('cleanup-preview').innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ 清理完成</strong><br>
+                            已删除 ${data.deleted} 条记录
+                        </div>
+                    `;
+                    document.getElementById('cleanup-btn').style.display = 'none';
+                    cleanupPreviewData = null;
+                    loadOverallStats();
+                } else {
+                    alert(data.detail || '清理失败');
+                }
+            } catch (e) {
+                alert('请求失败');
+            }
+        }
+        
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        // 点击模态框外部关闭
+        document.getElementById('user-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+    </script>
+</body>
+</html>
