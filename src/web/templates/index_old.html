@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NGA Monitor - 监控管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #34495e;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="text"], input[type="number"], input[type="url"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+        .btn-success:hover { background: #229954; }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+        .btn-warning:hover { background: #e67e22; }
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        .btn-secondary:hover { background: #7f8c8d; }
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            font-weight: 600;
+            color: #555;
+            background: #f8f9fa;
+        }
+        tr:hover { background: #f8f9fa; }
+        .badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .actions {
+            display: flex;
+            gap: 5px;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .alert {
+            padding: 12px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .hidden { display: none; }
+        /* 日志行颜色 */
+        tr.log-error {
+            background: #f8d7da !important;
+        }
+        tr.log-warning {
+            background: #fff3cd !important;
+        }
+        tr.log-error:hover,
+        tr.log-warning:hover {
+            filter: brightness(0.95);
+        }
+        .flex {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .flex-grow { flex: 1; }
+        .nav-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            background: #f8f9fa;
+            color: #555;
+            font-weight: 500;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .nav-btn:hover {
+            background: #e9ecef;
+        }
+        .nav-btn.active {
+            background: #3498db;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📡 NGA Monitor - 监控管理</h1>
+        
+        <div class="nav" style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <a href="/" class="nav-btn active">📡 监控管理</a>
+            <a href="/ai" class="nav-btn">🤖 AI 分析</a>
+            <a href="/data" class="nav-btn">📊 数据管理</a>
+        </div>
+        
+        <div id="alert" class="alert hidden"></div>
+        
+        <!-- 统计信息 -->
+        <div class="card">
+            <h2>📊 统计信息</h2>
+            <div class="stats" id="stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-targets">-</div>
+                    <div class="stat-label">监控目标</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-enabled">-</div>
+                    <div class="stat-label">已启用</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-sent">-</div>
+                    <div class="stat-label">总发送数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-recent">-</div>
+                    <div class="stat-label">24小时发送</div>
+                </div>
+            </div>
+            
+            <!-- 按目标统计 -->
+            <h3 style="margin-top: 20px; margin-bottom: 10px;">📈 各目标发送统计</h3>
+            <table id="target-stats-table">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>UID</th>
+                        <th>发送数</th>
+                    </tr>
+                </thead>
+                <tbody id="target-stats-body">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Cookie 状态 -->
+        <div class="card">
+            <h2>🍪 NGA 登录状态</h2>
+            <div id="cookie-status">
+                <p>加载中...</p>
+            </div>
+        </div>
+        
+        <!-- 调度规则配置 -->
+        <div class="card">
+            <h2>⏰ 调度规则配置</h2>
+            <div id="schedule-status" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+                <p>加载中...</p>
+            </div>
+            
+            <h3 style="margin-bottom: 10px; color: #555;">当前规则</h3>
+            <table id="schedule-rules-table">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>时间段</th>
+                        <th>模式</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="schedule-rules-body">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+            
+            <h3 style="margin: 20px 0 10px; color: #555;">添加规则</h3>
+            <div class="flex" style="flex-wrap: wrap; gap: 10px;">
+                <div class="form-group" style="flex: 1; min-width: 150px;">
+                    <label>规则名称</label>
+                    <input type="text" id="rule-name" placeholder="如：夜间模式">
+                </div>
+                <div class="form-group" style="width: 100px;">
+                    <label>开始时间</label>
+                    <input type="text" id="rule-start" placeholder="00:00" maxlength="5">
+                </div>
+                <div class="form-group" style="width: 100px;">
+                    <label>结束时间</label>
+                    <input type="text" id="rule-end" placeholder="08:00" maxlength="5">
+                </div>
+                <div class="form-group" style="width: 120px;">
+                    <label>间隔(秒)</label>
+                    <input type="number" id="rule-interval" value="60" min="0">
+                </div>
+                <div class="form-group" style="width: 100px;">
+                    <label>总结模式</label>
+                    <select id="rule-summary" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                    </select>
+                </div>
+                <div class="form-group" style="width: 80px;">
+                    <label>优先级</label>
+                    <input type="number" id="rule-priority" value="0">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="addScheduleRule()" style="margin-top: 10px;">添加规则</button>
+            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                💡 <strong>提示：</strong>总结模式只在结束时间点执行一次推送；间隔设为0表示该时段不检查
+            </p>
+        </div>
+        
+        <!-- Webhook 配置 -->
+        <div class="card">
+            <h2>🔗 Discord Webhook 配置</h2>
+            <div class="form-group">
+                <label>当前 Webhook</label>
+                <input type="text" id="current-webhook" value="{{ webhook }}" readonly>
+            </div>
+            <div class="flex">
+                <div class="form-group flex-grow">
+                    <input type="url" id="webhook-url" placeholder="输入新的 Webhook URL">
+                </div>
+                <button class="btn btn-primary" onclick="updateWebhook()">更新</button>
+                <button class="btn btn-success" onclick="testWebhook()">测试</button>
+            </div>
+        </div>
+        
+        <!-- 添加监控目标 -->
+        <div class="card">
+            <h2>➕ 添加监控目标</h2>
+            
+            <!-- 通过 URL 解析 -->
+            <div class="form-group">
+                <label>方式1: 输入 NGA 用户主页链接自动解析</label>
+                <div class="flex">
+                    <input type="url" id="parse-url" placeholder="https://nga.178.com/nuke.php?func=ucp&uid=557398" class="flex-grow">
+                    <button class="btn btn-success" onclick="parseUrl()">解析</button>
+                </div>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">支持: 用户主页、搜索页面等链接</p>
+            </div>
+            
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #eee;">
+            
+            <!-- 手动输入 -->
+            <p style="margin-bottom: 10px; color: #666;">方式2: 手动输入</p>
+            <div class="flex">
+                <div class="form-group flex-grow">
+                    <label>NGA 用户 UID</label>
+                    <input type="text" id="new-uid" placeholder="例如: 557398">
+                </div>
+                <div class="form-group flex-grow">
+                    <label>名称（可选）</label>
+                    <input type="text" id="new-name" placeholder="显示名称">
+                </div>
+                <div class="form-group" style="width: 120px;">
+                    <label>间隔（秒）</label>
+                    <input type="number" id="new-interval" value="60" min="10">
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="addTarget()">添加监控</button>
+        </div>
+        
+        <!-- 监控目标列表 -->
+        <div class="card">
+            <h2>📋 监控目标列表</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>UID</th>
+                        <th>名称</th>
+                        <th>状态</th>
+                        <th>间隔</th>
+                        <th>更新时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="targets-table">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- 日志查看 -->
+        <div class="card">
+            <h2>📜 最近日志</h2>
+            <div class="flex" style="margin-bottom: 15px;">
+                <select id="log-level" class="btn btn-secondary" style="width: 120px;">
+                    <option value="">全部级别</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+                <button class="btn btn-secondary" onclick="loadLogs()">刷新</button>
+                <button class="btn btn-danger" onclick="cleanupLogs()">清理7天前日志</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>级别</th>
+                        <th>目标</th>
+                        <th>消息</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table">
+                    <!-- 动态生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时获取数据
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadTargets();
+            loadLogs();
+            loadCookieStatus();
+            loadScheduleStatus();
+            loadScheduleRules();
+        });
+        
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = 'alert ' + (type === 'success' ? 'alert-success' : 'alert-error');
+            alert.classList.remove('hidden');
+            setTimeout(() => alert.classList.add('hidden'), 5000);
+        }
+        
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                document.getElementById('stat-targets').textContent = data.targets.total;
+                document.getElementById('stat-enabled').textContent = data.targets.enabled;
+                document.getElementById('stat-sent').textContent = data.sent.total;
+                document.getElementById('stat-recent').textContent = data.sent.recent_24h;
+                
+                // 加载各目标统计
+                if (data.target_stats) {
+                    const tbody = document.getElementById('target-stats-body');
+                    tbody.innerHTML = data.target_stats.map(t => `
+                        <tr>
+                            <td>${t.name || '-'}</td>
+                            <td>${t.uid}</td>
+                            <td><span class="badge badge-success">${t.sent_count}</span></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error('加载统计失败:', e);
+            }
+        }
+        
+        async function loadCookieStatus() {
+            try {
+                const res = await fetch('/api/cookie-status');
+                const data = await res.json();
+                const container = document.getElementById('cookie-status');
+                
+                if (!data.exists) {
+                    container.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>⚠️ Cookie 文件不存在</strong><br>
+                            请先运行 export_nga_state.py 生成登录状态
+                        </div>
+                    `;
+                    return;
+                }
+                
+                if (data.error) {
+                    container.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ 读取失败:</strong> ${data.error}
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // 构建 Cookie 状态显示
+                let cookieHtml = `
+                    <div style="margin-bottom: 15px;">
+                        <strong>总 Cookie 数:</strong> ${data.cookie_count}<br>
+                        <strong>最后更新:</strong> ${new Date(data.last_modified).toLocaleString()}
+                    </div>
+                    <table style="font-size: 14px;">
+                        <thead>
+                            <tr>
+                                <th>Cookie 名称</th>
+                                <th>状态</th>
+                                <th>过期时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                for (const [name, info] of Object.entries(data.nga_cookies || {})) {
+                    const status = info.has_value ? '✅ 有效' : '❌ 空值';
+                    const expires = info.expires && info.expires !== 'N/A' 
+                        ? new Date(info.expires * 1000).toLocaleString() 
+                        : '会话';
+                    cookieHtml += `
+                        <tr>
+                            <td>${name}</td>
+                            <td>${status}</td>
+                            <td>${expires}</td>
+                        </tr>
+                    `;
+                }
+                
+                cookieHtml += '</tbody></table>';
+                container.innerHTML = cookieHtml;
+                
+            } catch (e) {
+                console.error('加载 Cookie 状态失败:', e);
+                document.getElementById('cookie-status').innerHTML = `
+                    <div class="alert alert-error">加载失败: ${e.message}</div>
+                `;
+            }
+        }
+        
+        async function parseUrl() {
+            const url = document.getElementById('parse-url').value.trim();
+            if (!url) {
+                showAlert('请输入 URL', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/parse-url', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('new-uid').value = data.uid;
+                    showAlert(`解析成功: UID ${data.uid}`);
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '解析失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+        
+        // 格式化时间为东八区（手动计算，确保兼容性）
+        function formatTime(utcTime) {
+            if (!utcTime) return '-';
+            const date = new Date(utcTime);
+            // 东八区偏移 +8 小时
+            const offset = 8 * 60 * 60 * 1000;
+            const localDate = new Date(date.getTime() + offset);
+            
+            const y = localDate.getUTCFullYear();
+            const m = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+            const d = String(localDate.getUTCDate()).padStart(2, '0');
+            const h = String(localDate.getUTCHours()).padStart(2, '0');
+            const min = String(localDate.getUTCMinutes()).padStart(2, '0');
+            const s = String(localDate.getUTCSeconds()).padStart(2, '0');
+            
+            return `${y}/${m}/${d} ${h}:${min}:${s}`;
+        }
+        
+        async function loadTargets() {
+            try {
+                const res = await fetch('/api/targets');
+                const data = await res.json();
+                const tbody = document.getElementById('targets-table');
+                tbody.innerHTML = data.targets.map(t => `
+                    <tr>
+                        <td>${t.uid}</td>
+                        <td>${t.name || '-'}</td>
+                        <td>
+                            <span class="badge ${t.enabled ? 'badge-success' : 'badge-danger'}">
+                                ${t.enabled ? '启用' : '禁用'}
+                            </span>
+                        </td>
+                        <td>${t.check_interval}s</td>
+                        <td>${formatTime(t.updated_at)}</td>
+                        <td class="actions">
+                            <button class="btn btn-success btn-sm" onclick="testTarget(${t.id}); return false;">测试</button>
+                            <button class="btn btn-warning btn-sm" onclick="forceSendTarget(${t.id}); return false;" title="强制发送最新回复（不管是否已发送过）">强制</button>
+                            <button class="btn btn-${t.enabled ? 'secondary' : 'primary'} btn-sm" onclick="toggleTarget(${t.id}, ${!t.enabled})">
+                                ${t.enabled ? '禁用' : '启用'}
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteTarget(${t.id})">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('加载目标失败:', e);
+            }
+        }
+        
+        // 获取日志级别对应的颜色样式类
+        function getLogLevelClass(level) {
+            switch(level) {
+                case 'ERROR': return 'badge-danger';
+                case 'WARNING': return 'badge-warning';
+                case 'DEBUG': return 'badge-info';
+                default: return 'badge-success';
+            }
+        }
+        
+        // 获取日志行的背景色
+        function getLogRowClass(level) {
+            switch(level) {
+                case 'ERROR': return 'log-error';
+                case 'WARNING': return 'log-warning';
+                default: return '';
+            }
+        }
+        
+        async function loadLogs() {
+            try {
+                const level = document.getElementById('log-level').value;
+                const url = level ? `/api/logs?level=${level}` : '/api/logs';
+                const res = await fetch(url);
+                const data = await res.json();
+                const tbody = document.getElementById('logs-table');
+                tbody.innerHTML = data.logs.map(l => `
+                    <tr class="${getLogRowClass(l.level)}">
+                        <td>${formatTime(l.created_at)}</td>
+                        <td>
+                            <span class="badge ${getLogLevelClass(l.level)}">
+                                ${l.level}
+                            </span>
+                        </td>
+                        <td>${l.target_uid || '-'}</td>
+                        <td>${l.message}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('加载日志失败:', e);
+            }
+        }
+        
+        async function addTarget() {
+            const uid = document.getElementById('new-uid').value.trim();
+            const name = document.getElementById('new-name').value.trim();
+            const interval = parseInt(document.getElementById('new-interval').value) || 60;
+            
+            if (!uid) {
+                showAlert('请输入 UID', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/targets', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({uid, name, check_interval: interval})
+                });
+                
+                if (res.ok) {
+                    showAlert('添加成功');
+                    document.getElementById('new-uid').value = '';
+                    document.getElementById('new-name').value = '';
+                    loadTargets();
+                    loadStats();
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '添加失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+        
+        async function toggleTarget(id, enabled) {
+            try {
+                const res = await fetch(`/api/targets/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled})
+                });
+                
+                if (res.ok) {
+                    showAlert(enabled ? '已启用' : '已禁用');
+                    loadTargets();
+                    loadStats();
+                }
+            } catch (e) {
+                showAlert('操作失败', 'error');
+            }
+        }
+        
+        async function deleteTarget(id) {
+            if (!confirm('确定要删除这个监控目标吗？')) return;
+            
+            try {
+                const res = await fetch(`/api/targets/${id}`, {method: 'DELETE'});
+                if (res.ok) {
+                    showAlert('删除成功');
+                    loadTargets();
+                    loadStats();
+                }
+            } catch (e) {
+                showAlert('删除失败', 'error');
+            }
+        }
+        
+        async function testTarget(id) {
+            console.log('testTarget called with id:', id);
+            try {
+                showAlert('正在测试...');
+                const res = await fetch(`/api/targets/${id}/test`, {method: 'POST'});
+                console.log('Response status:', res.status);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('Response data:', data);
+                    showAlert(data.message);
+                    loadStats();
+                } else {
+                    const err = await res.json();
+                    console.error('Error response:', err);
+                    showAlert(err.detail || '测试失败', 'error');
+                }
+            } catch (e) {
+                console.error('Exception:', e);
+                showAlert('请求失败: ' + e.message, 'error');
+            }
+        }
+        
+        async function forceSendTarget(id) {
+            if (!confirm('确定要强制发送吗？这会发送最新回复（即使已发送过）')) return;
+            
+            console.log('forceSendTarget called with id:', id);
+            try {
+                showAlert('正在强制发送...');
+                const res = await fetch(`/api/targets/${id}/force-send`, {method: 'POST'});
+                console.log('Response status:', res.status);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    console.log('Response data:', data);
+                    showAlert('强制发送: ' + data.message);
+                    loadStats();
+                } else {
+                    const err = await res.json();
+                    console.error('Error response:', err);
+                    showAlert(err.detail || '强制发送失败', 'error');
+                }
+            } catch (e) {
+                console.error('Exception:', e);
+                showAlert('请求失败: ' + e.message, 'error');
+            }
+        }
+        
+        async function updateWebhook() {
+            const url = document.getElementById('webhook-url').value.trim();
+            if (!url) {
+                showAlert('请输入 Webhook URL', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/webhook', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                
+                if (res.ok) {
+                    showAlert('Webhook 已更新');
+                    document.getElementById('current-webhook').value = url.substring(0, 50) + '...';
+                    document.getElementById('webhook-url').value = '';
+                } else {
+                    showAlert('更新失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+        
+        async function testWebhook() {
+            try {
+                showAlert('正在发送测试消息...');
+                const res = await fetch('/api/webhook/test', {method: 'POST'});
+                
+                if (res.ok) {
+                    showAlert('测试消息已发送到 Discord');
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '测试失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+        
+        async function cleanupLogs() {
+            if (!confirm('确定要清理 7 天前的日志吗？')) return;
+            
+            try {
+                const res = await fetch('/api/logs/cleanup', {method: 'POST'});
+                if (res.ok) {
+                    const data = await res.json();
+                    showAlert(`已清理 ${data.deleted} 条旧日志`);
+                    loadLogs();
+                }
+            } catch (e) {
+                showAlert('清理失败', 'error');
+            }
+        }
+        
+        // ========== 调度规则管理 ==========
+        
+        async function loadScheduleStatus() {
+            try {
+                const res = await fetch('/api/schedule/status');
+                const data = await res.json();
+                const container = document.getElementById('schedule-status');
+                
+                if (data.current_rule) {
+                    container.innerHTML = `
+                        <strong>当前规则:</strong> ${data.current_rule.name} (${data.current_rule.start_time}-${data.current_rule.end_time})<br>
+                        <strong>状态:</strong> ${data.status}<br>
+                        <strong>下次检查:</strong> ${data.next_check ? new Date(data.next_check).toLocaleString() : '-'}
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <strong>当前状态:</strong> ${data.status}<br>
+                        <strong>下次检查:</strong> ${data.next_check ? new Date(data.next_check).toLocaleString() : '-'}
+                    `;
+                }
+            } catch (e) {
+                console.error('加载调度状态失败:', e);
+            }
+        }
+        
+        async function loadScheduleRules() {
+            try {
+                const res = await fetch('/api/schedule/rules');
+                const data = await res.json();
+                const tbody = document.getElementById('schedule-rules-body');
+                
+                tbody.innerHTML = data.rules.map(r => `
+                    <tr>
+                        <td>${r.name}</td>
+                        <td>${r.start_time} - ${r.end_time}</td>
+                        <td>${r.is_summary ? '总结模式' : (r.interval_seconds > 0 ? `每${r.interval_seconds}秒` : '暂停')}</td>
+                        <td>
+                            <span class="badge ${r.enabled ? 'badge-success' : 'badge-danger'}">
+                                ${r.enabled ? '启用' : '禁用'}
+                            </span>
+                        </td>
+                        <td class="actions">
+                            <button class="btn btn-secondary btn-sm" onclick="toggleScheduleRule(${r.id}, ${!r.enabled})">
+                                ${r.enabled ? '禁用' : '启用'}
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteScheduleRule(${r.id})">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('加载调度规则失败:', e);
+            }
+        }
+        
+        async function addScheduleRule() {
+            const name = document.getElementById('rule-name').value.trim();
+            const startTime = document.getElementById('rule-start').value.trim();
+            const endTime = document.getElementById('rule-end').value.trim();
+            const interval = parseInt(document.getElementById('rule-interval').value) || 60;
+            const isSummary = document.getElementById('rule-summary').value === 'true';
+            const priority = parseInt(document.getElementById('rule-priority').value) || 0;
+            
+            if (!name || !startTime || !endTime) {
+                showAlert('请填写完整的规则信息', 'error');
+                return;
+            }
+            
+            // 验证时间格式
+            if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
+                showAlert('时间格式错误，请使用 HH:MM 格式', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/schedule/rules', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name,
+                        start_time: startTime,
+                        end_time: endTime,
+                        interval_seconds: interval,
+                        is_summary: isSummary,
+                        priority,
+                        enabled: true
+                    })
+                });
+                
+                if (res.ok) {
+                    showAlert('规则添加成功');
+                    document.getElementById('rule-name').value = '';
+                    document.getElementById('rule-start').value = '';
+                    document.getElementById('rule-end').value = '';
+                    document.getElementById('rule-interval').value = '60';
+                    document.getElementById('rule-summary').value = 'false';
+                    loadScheduleRules();
+                    loadScheduleStatus();
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '添加失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+        
+        async function toggleScheduleRule(id, enabled) {
+            try {
+                const res = await fetch(`/api/schedule/rules/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled})
+                });
+                
+                if (res.ok) {
+                    showAlert(enabled ? '规则已启用' : '规则已禁用');
+                    loadScheduleRules();
+                    loadScheduleStatus();
+                }
+            } catch (e) {
+                showAlert('操作失败', 'error');
+            }
+        }
+        
+        async function deleteScheduleRule(id) {
+            if (!confirm('确定要删除这个调度规则吗？')) return;
+            
+            try {
+                const res = await fetch(`/api/schedule/rules/${id}`, {method: 'DELETE'});
+                if (res.ok) {
+                    showAlert('规则已删除');
+                    loadScheduleRules();
+                    loadScheduleStatus();
+                }
+            } catch (e) {
+                showAlert('删除失败', 'error');
+            }
+        }
+        
+        // 每 30 秒自动刷新
+        setInterval(() => {
+            loadStats();
+            loadLogs();
+            loadScheduleStatus();
+        }, 30000);
+    </script>
+</body>
+</html>
