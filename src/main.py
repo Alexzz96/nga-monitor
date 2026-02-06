@@ -7,6 +7,7 @@ NGA Monitor - 主入口
 import os
 import sys
 import asyncio
+import signal
 from datetime import datetime
 
 from uvicorn.config import Config as UvicornConfig
@@ -14,10 +15,11 @@ from uvicorn.server import Server
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from logger import setup_logging
+from logger import setup_logging, shutdown_logging
 from db.models import init_db
 from monitor import check_all_targets
 from schedule_manager import ScheduleManager
+from browser_pool import close_browser_pool
 
 init_db()
 
@@ -75,6 +77,11 @@ async def main():
     logger.info("NGA Monitor 启动")
     logger.info("=" * 60)
     
+    # 注册信号处理
+    loop = asyncio.get_event_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, lambda: asyncio.create_task(shutdown()))
+    
     storage_path = os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.json')
     if not os.path.exists(storage_path):
         logger.error(f"错误: Storage state 文件不存在: {storage_path}")
@@ -89,7 +96,32 @@ async def main():
     
     config = UvicornConfig(app, host="0.0.0.0", port=port, log_level="warning")
     server = Server(config)
-    await server.serve()
+    
+    try:
+        await server.serve()
+    except asyncio.CancelledError:
+        logger.info("收到取消信号，正在关闭...")
+    finally:
+        await shutdown()
+
+
+async def shutdown():
+    """优雅关闭"""
+    logger.info("正在关闭服务...")
+    
+    global SCHEDULER
+    if SCHEDULER:
+        SCHEDULER.shutdown()
+        logger.info("调度器已关闭")
+    
+    await close_browser_pool()
+    logger.info("浏览器池已关闭")
+    
+    shutdown_logging()
+    logger.info("日志系统已关闭")
+    
+    logger.info("服务已完全关闭")
+    sys.exit(0)
 
 if __name__ == '__main__':
     asyncio.run(main())

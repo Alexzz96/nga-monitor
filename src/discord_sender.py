@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
 """
-Discord Webhook 发送模块
+Discord Webhook 发送模块（带限流保护）
 """
 
 import re
 import httpx
 from datetime import datetime, timezone
+from rate_limiter import get_discord_limiter
 
 # 预编译正则表达式
 REPLY_USER_RE = re.compile(r'\[([^\]]+)\]\s*\(([^\)]+)\)')
 TIME_RE = re.compile(r'\(\d{4}-\d{2}-\d{2}[\s\d:]+\)')
 CLEAN_IMG_RE = re.compile(r'^显示图片\(\d+K\)')
 
+
 class DiscordSender:
     def __init__(self, webhook_url):
         self.webhook_url = webhook_url
+        self._limiter = get_discord_limiter()
     
     async def send_reply(self, reply):
         """
-        发送回复到 Discord webhook (异步)
+        发送回复到 Discord webhook (异步，带限流)
         
         Args:
             reply: 回复数据字典（需包含分离的 quote_content 和 main_content）
@@ -26,6 +29,12 @@ class DiscordSender:
         Returns:
             bool: 是否发送成功
         """
+        # 等待限流许可
+        can_send = await self._limiter.acquire(timeout=30)
+        if not can_send:
+            print(f"[DiscordSender] 限流等待超时，跳过发送")
+            return False
+        
         try:
             quote_content = reply.get('quote_content', '')
             main_content = reply.get('main_content', '')

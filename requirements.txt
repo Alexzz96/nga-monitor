@@ -3,6 +3,8 @@ httpx>=0.27.0
 playwright>=1.40.0
 apscheduler>=3.10.4
 python-dotenv>=1.0.0
+psutil>=5.9.0  # 用于性能监控
+pyyaml>=6.0    # 用于配置文件
 
 # 数据库
 sqlalchemy>=2.0.0

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 监控任务模块 - 供 Web 和后台调度器共用
+使用特定异常类型，细化错误处理
 """
 
 import os
@@ -10,6 +11,10 @@ from datetime import datetime, timezone
 from db.models import SessionLocal, MonitorTarget, SentRecord, Config, ReplyArchive, ArchiveTask
 from nga_crawler import NgaCrawler
 from discord_sender import DiscordSender
+from exceptions import (
+    LoginExpiredError, NetworkError, ParseError, 
+    RateLimitError, WebhookError, handle_exception
+)
 
 STORAGE_STATE_PATH = os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.json')
 DEBUG_MODE = os.getenv('DEBUG', 'false').lower() == 'true'
@@ -50,7 +55,21 @@ async def check_and_send(target_id, force=False):
         ).all()}
         
         crawler = NgaCrawler(STORAGE_STATE_PATH)
-        replies = await crawler.fetch_replies(target.url)
+        
+        try:
+            replies = await crawler.fetch_replies(target.url)
+        except LoginExpiredError as e:
+            logger.error(f"登录过期: {e}", extra={'target_uid': target.uid})
+            return {"success": False, "message": "NGA登录已过期，请重新导出storage state", "fatal": True}
+        except RateLimitError as e:
+            logger.warning(f"触发限流: {e}", extra={'target_uid': target.uid})
+            return {"success": False, "message": "触发网站限流，稍后重试"}
+        except NetworkError as e:
+            logger.warning(f"网络错误: {e}", extra={'target_uid': target.uid})
+            return {"success": False, "message": f"网络错误: {e}"}
+        except ParseError as e:
+            logger.warning(f"解析错误: {e}", extra={'target_uid': target.uid})
+            return {"success": False, "message": f"页面解析失败: {e}"}
         
         if not replies:
             logger.info(f"用户 {target.uid}: 没有获取到回复", extra={'target_uid': target.uid})
@@ -80,9 +99,13 @@ async def check_and_send(target_id, force=False):
                 new_pids = [r.get('pid', 'N/A') for r in new_replies]
                 logger.debug(f"[调试] 新回复 PID 列表: {new_pids}", extra={'target_uid': target.uid})
         
-        # 批量保存抓取到的回复到存档（用于AI分析）
-        archived_count = await _bulk_archive_replies(db, target.id, replies)
-        logger.debug(f"用户 {target.uid}: 已存档 {archived_count} 条回复", extra={'target_uid': target.uid})
+        # 批量保存抓取到的回复到存档
+        try:
+            archived_count = await _bulk_archive_replies(db, target.id, replies)
+            logger.debug(f"用户 {target.uid}: 已存档 {archived_count} 条回复", extra={'target_uid': target.uid})
+        except Exception as e:
+            logger.error(f"存档失败: {e}", extra={'target_uid': target.uid})
+            # 存档失败不影响主流程
         
         if not new_replies:
             logger.info(f"用户 {target.uid}: 没有新回复", extra={'target_uid': target.uid})
@@ -98,7 +121,12 @@ async def check_and_send(target_id, force=False):
         latest = new_replies[0]
         latest['target_name'] = target.name or target.uid
         sender = DiscordSender(webhook)
-        success = await sender.send_reply(latest)
+        
+        try:
+            success = await sender.send_reply(latest)
+        except WebhookError as e:
+            logger.error(f"Webhook 发送失败: {e}", extra={'target_uid': target.uid})
+            success = False
         
         record = SentRecord(
             target_id=target.id,
@@ -125,8 +153,9 @@ async def check_and_send(target_id, force=False):
             return {"success": False, "message": "发送失败"}
             
     except Exception as e:
+        # 未预期的异常，记录详细信息
         logger.error(f"检查用户 {target_id} 时出错: {e}", exc_info=True)
-        return {"success": False, "message": str(e)}
+        return {"success": False, "message": f"内部错误: {type(e).__name__}"}
     finally:
         db.close()
 
@@ -253,27 +282,29 @@ async def archive_history_task(target_id: int, max_pages: int = 25):
         db.close()
 
 
-async def _bulk_archive_replies(db, target_id: int, replies: list) -> int:
+async def _bulk_archive_replies(db, target_id: int, replies: list, return_stats: bool = False):
     """
-    批量存档回复到数据库
+    批量存档回复到数据库（统一版本）
     
     Args:
         db: 数据库会话
         target_id: 目标用户ID
         replies: 回复列表
+        return_stats: 是否返回统计信息
         
     Returns:
-        int: 实际插入的新记录数
+        int: 实际插入的新记录数（return_stats=False）
+        tuple: (插入数量, 跳过数量)（return_stats=True）
     """
     if not replies:
-        return 0
+        return (0, 0) if return_stats else 0
     
     try:
         # 1. 批量查询所有已存在的PID（单次查询）
         reply_pids = [r['pid'] for r in replies if r.get('pid')]
         if not reply_pids:
             logger.warning("[Bulk Archive] 没有有效的PID需要处理")
-            return 0
+            return (0, 0) if return_stats else 0
         
         existing_pids = {
             row[0] for row in db.query(ReplyArchive.pid).filter(
@@ -287,9 +318,12 @@ async def _bulk_archive_replies(db, target_id: int, replies: list) -> int:
             if r.get('pid') and r['pid'] not in existing_pids
         ]
         
+        skipped_count = len(replies) - len(new_replies)
+        
         if not new_replies:
-            logger.debug(f"[Bulk Archive] 所有 {len(replies)} 条记录已存在，跳过插入")
-            return 0
+            log_msg = f"[Bulk Archive] 所有 {len(replies)} 条记录已存在，跳过插入"
+            logger.info(log_msg) if return_stats else logger.debug(log_msg)
+            return (0, skipped_count) if return_stats else 0
         
         # 3. 准备批量插入的数据映射
         archive_mappings = [
@@ -312,8 +346,8 @@ async def _bulk_archive_replies(db, target_id: int, replies: list) -> int:
         db.bulk_insert_mappings(ReplyArchive, archive_mappings)
         db.commit()
         
-        logger.info(f"[Bulk Archive] 批量插入完成: 新增 {len(new_replies)} 条, 跳过已存在 {len(existing_pids)} 条")
-        return len(new_replies)
+        logger.info(f"[Bulk Archive] 批量插入完成: 新增 {len(new_replies)} 条, 跳过已存在 {skipped_count} 条")
+        return (len(new_replies), skipped_count) if return_stats else len(new_replies)
         
     except Exception as e:
         db.rollback()
@@ -321,72 +355,8 @@ async def _bulk_archive_replies(db, target_id: int, replies: list) -> int:
         raise
 
 
+# 向后兼容的别名
 async def _bulk_archive_replies_with_stats(db, target_id: int, replies: list) -> tuple:
-    """
-    批量存档回复到数据库（返回统计信息版本）
-    
-    Args:
-        db: 数据库会话
-        target_id: 目标用户ID
-        replies: 回复列表
-        
-    Returns:
-        tuple: (插入数量, 跳过数量)
-    """
-    if not replies:
-        return 0, 0
-    
-    try:
-        # 1. 批量查询所有已存在的PID（单次查询）
-        reply_pids = [r['pid'] for r in replies if r.get('pid')]
-        if not reply_pids:
-            logger.warning("[Bulk Archive Stats] 没有有效的PID需要处理")
-            return 0, 0
-        
-        existing_pids = {
-            row[0] for row in db.query(ReplyArchive.pid).filter(
-                ReplyArchive.pid.in_(reply_pids)
-            ).all()
-        }
-        
-        # 2. 过滤出需要插入的新记录
-        new_replies = [
-            r for r in replies 
-            if r.get('pid') and r['pid'] not in existing_pids
-        ]
-        
-        skipped_count = len(replies) - len(new_replies)
-        
-        if not new_replies:
-            logger.info(f"[Bulk Archive Stats] 所有 {len(replies)} 条记录已存在，跳过插入")
-            return 0, skipped_count
-        
-        # 3. 准备批量插入的数据映射
-        archive_mappings = [
-            {
-                'target_id': target_id,
-                'pid': r['pid'],
-                'tid': r.get('tid', ''),
-                'topic_title': r.get('topic_title', ''),
-                'content_full': r.get('content_full', ''),
-                'quote_content': r.get('quote_content', ''),
-                'main_content': r.get('main_content', ''),
-                'forum': r.get('forum', ''),
-                'post_date': r.get('post_date', ''),
-                'url': r.get('url', '')
-            }
-            for r in new_replies
-        ]
-        
-        # 4. 使用SQLAlchemy批量插入（事务自动处理）
-        db.bulk_insert_mappings(ReplyArchive, archive_mappings)
-        db.commit()
-        
-        logger.info(f"[Bulk Archive Stats] 批量插入完成: 新增 {len(new_replies)} 条, 跳过已存在 {skipped_count} 条")
-        return len(new_replies), skipped_count
-        
-    except Exception as e:
-        db.rollback()
-        logger.error(f"[Bulk Archive Stats] 批量存档失败: {e}", exc_info=True)
-        raise
+    """批量存档（返回统计信息）- 兼容旧代码"""
+    return await _bulk_archive_replies(db, target_id, replies, return_stats=True)
 

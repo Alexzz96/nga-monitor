@@ -6,27 +6,39 @@
 
 from datetime import datetime, time, timedelta
 from typing import Optional, List, Tuple
+from contextlib import contextmanager
 from db.models import SessionLocal, ScheduleRule, DailySummary
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+@contextmanager
+def get_db_session():
+    """数据库会话上下文管理器（线程安全）"""
+    db = SessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 class ScheduleManager:
-    """调度管理器"""
+    """调度管理器（修复连接泄漏问题）"""
     
     def __init__(self):
-        self.db = SessionLocal()
-    
-    def __del__(self):
-        if hasattr(self, 'db'):
-            self.db.close()
+        # 不再需要维护线程本地存储，使用 contextmanager 管理会话
+        pass
     
     def get_active_rules(self) -> List[ScheduleRule]:
         """获取所有启用的调度规则，按优先级排序"""
-        return self.db.query(ScheduleRule).filter(
-            ScheduleRule.enabled == True
-        ).order_by(ScheduleRule.priority.desc()).all()
+        with get_db_session() as db:
+            return db.query(ScheduleRule).filter(
+                ScheduleRule.enabled == True
+            ).order_by(ScheduleRule.priority.desc()).all()
     
     def get_current_rule(self, check_time: Optional[datetime] = None) -> Optional[ScheduleRule]:
         """
@@ -40,10 +52,14 @@ class ScheduleManager:
         
         current_time = check_time.strftime('%H:%M')
         
-        rules = self.get_active_rules()
-        for rule in rules:
-            if self._is_time_in_range(current_time, rule.start_time, rule.end_time):
-                return rule
+        with get_db_session() as db:
+            rules = db.query(ScheduleRule).filter(
+                ScheduleRule.enabled == True
+            ).order_by(ScheduleRule.priority.desc()).all()
+            
+            for rule in rules:
+                if self._is_time_in_range(current_time, rule.start_time, rule.end_time):
+                    return rule
         
         return None
     
@@ -92,16 +108,17 @@ class ScheduleManager:
         now = datetime.now()
         current_time = now.strftime('%H:%M')
         
-        # 检查今天是否已经发送过总结
-        today = now.strftime('%Y-%m-%d')
-        summary_sent = self.db.query(DailySummary).filter(
-            DailySummary.date == today,
-            DailySummary.rule_id == rule.id
-        ).first()
-        
-        if summary_sent:
-            logger.debug(f"今天 {today} 已发送过 {rule.name} 的总结")
-            return False
+        with get_db_session() as db:
+            # 检查今天是否已经发送过总结
+            today = now.strftime('%Y-%m-%d')
+            summary_sent = db.query(DailySummary).filter(
+                DailySummary.date == today,
+                DailySummary.rule_id == rule.id
+            ).first()
+            
+            if summary_sent:
+                logger.debug(f"今天 {today} 已发送过 {rule.name} 的总结")
+                return False
         
         # 检查是否接近结束时间（5分钟内）
         end_hour, end_min = map(int, rule.end_time.split(':'))
@@ -122,15 +139,16 @@ class ScheduleManager:
     
     def mark_summary_sent(self, rule_id: int, target_id: int, new_count: int = 0):
         """标记总结已发送"""
-        today = datetime.now().strftime('%Y-%m-%d')
-        summary = DailySummary(
-            date=today,
-            target_id=target_id,
-            rule_id=rule_id,
-            new_count=new_count
-        )
-        self.db.add(summary)
-        self.db.commit()
+        with get_db_session() as db:
+            today = datetime.now().strftime('%Y-%m-%d')
+            summary = DailySummary(
+                date=today,
+                target_id=target_id,
+                rule_id=rule_id,
+                new_count=new_count
+            )
+            db.add(summary)
+            db.commit()
     
     def get_next_check_time(self) -> Optional[datetime]:
         """获取下次应该检查的时间"""
@@ -151,17 +169,21 @@ class ScheduleManager:
         now = datetime.now()
         current_time = now.strftime('%H:%M')
         
-        rules = self.get_active_rules()
-        for rule in rules:
-            if rule.start_time > current_time:
-                hour, minute = map(int, rule.start_time.split(':'))
-                return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        
-        # 如果没有找到，返回第一个规则的明天时间
-        if rules:
-            hour, minute = map(int, rules[0].start_time.split(':'))
-            tomorrow = now + timedelta(days=1)
-            return tomorrow.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        with get_db_session() as db:
+            rules = db.query(ScheduleRule).filter(
+                ScheduleRule.enabled == True
+            ).order_by(ScheduleRule.priority.desc()).all()
+            
+            for rule in rules:
+                if rule.start_time > current_time:
+                    hour, minute = map(int, rule.start_time.split(':'))
+                    return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+            
+            # 如果没有找到，返回第一个规则的明天时间
+            if rules:
+                hour, minute = map(int, rules[0].start_time.split(':'))
+                tomorrow = now + timedelta(days=1)
+                return tomorrow.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
         return None
     
@@ -190,7 +212,14 @@ class ScheduleManager:
             }
         
         return {
-            'current_rule': rule.to_dict(),
+            'current_rule': rule.to_dict() if hasattr(rule, 'to_dict') else {
+                'id': rule.id,
+                'name': rule.name,
+                'start_time': rule.start_time,
+                'end_time': rule.end_time,
+                'interval_seconds': rule.interval_seconds,
+                'is_summary': rule.is_summary
+            },
             'status': '总结模式' if rule.is_summary else f'每{rule.interval_seconds}秒检查',
             'next_check': next_check.isoformat() if next_check else None
         }

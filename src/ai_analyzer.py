@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AI 分析模块 - 分析用户回复风格
+AI 分析模块 - 分析用户回复风格（带限流保护）
 支持 OpenAI 和 Kimi (Moonshot)
 """
 
@@ -9,13 +9,14 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Optional
 from db.models import SessionLocal, ReplyArchive, AIAnalysisReport, MonitorTarget, Config
+from rate_limiter import get_ai_limiter
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class AIAnalyzer:
-    """AI 分析器"""
+    """AI 分析器（带限流）"""
     
     def __init__(self, config: dict = None):
         """
@@ -40,9 +41,11 @@ class AIAnalyzer:
         self.system_prompt = self.config.get('system_prompt', '你是一位专业的投资行为分析师。')
         self.analysis_prompt = self.config.get('analysis_prompt', '')
         
+        # 限流器
+        self._limiter = get_ai_limiter()
+        
         logger.info(f"[AIAnalyzer] 配置: provider={self.provider}, model={self.model}, base={self.api_base}")
         logger.info(f"[AIAnalyzer] API Key 已配置: {bool(self.api_key)}")
-        # 安全：不记录 API Key 的任何部分
     
     def _load_config_from_db(self) -> dict:
         """从数据库加载配置"""
@@ -53,26 +56,29 @@ class AIAnalyzer:
             db.close()
     
     async def _call_api(self, messages: List[Dict]) -> Optional[str]:
-        """调用 AI API (异步)"""
+        """调用 AI API (异步，带限流)"""
+        # 等待限流许可
+        can_proceed = await self._limiter.acquire(timeout=60)
+        if not can_proceed:
+            logger.error("[AI API] 限流等待超时")
+            return None
+        
         try:
             import httpx
             
             logger.info(f"[AI API] 开始调用 - Model: {self.model}, Base: {self.api_base}")
-            # 安全：不记录 API Key
             
             headers = {
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json'
             }
             
-            # 不传 temperature，使用模型默认值
             payload = {
                 'model': self.model,
                 'messages': messages,
                 'max_tokens': 2000
             }
             
-            # 安全：不记录可能包含敏感信息的 payload
             logger.debug(f"[AI API] 消息数量: {len(messages)}")
             
             async with httpx.AsyncClient(timeout=60) as client:
@@ -88,11 +94,9 @@ class AIAnalyzer:
                 result = response.json()
                 content = result['choices'][0]['message']['content']
                 logger.info(f"[AI API] 调用成功，返回内容长度: {len(content)}")
-                logger.debug(f"[AI API] 返回内容前200字: {content[:200]}...")
                 return content
             else:
                 logger.error(f"[AI API] 错误: {response.status_code}")
-                # 安全：限制错误响应长度，避免泄露敏感信息
                 error_text = response.text[:500] if len(response.text) > 500 else response.text
                 logger.error(f"[AI API] 响应内容: {error_text}")
                 return None
@@ -187,8 +191,6 @@ class AIAnalyzer:
             ]
             
             logger.info(f"[分析用户] 开始调用 AI，用户: {target.name}")
-            logger.debug(f"[分析用户] System Prompt: {self.system_prompt[:100]}...")
-            logger.debug(f"[分析用户] User Prompt 前200字: {user_prompt[:200]}...")
             
             # 调用 AI (异步)
             response = await self._call_api(messages)
@@ -200,14 +202,12 @@ class AIAnalyzer:
             
             # 解析 JSON
             try:
-                # 尝试提取 JSON 部分
                 json_start = response.find('{')
                 json_end = response.rfind('}') + 1
                 logger.debug(f"[分析用户] JSON 提取: start={json_start}, end={json_end}")
                 
                 if json_start >= 0 and json_end > json_start:
                     json_str = response[json_start:json_end]
-                    logger.debug(f"[分析用户] 提取的 JSON 字符串前200字: {json_str[:200]}...")
                     analysis_result = json.loads(json_str)
                 else:
                     analysis_result = json.loads(response)
@@ -215,7 +215,6 @@ class AIAnalyzer:
                 logger.info(f"[分析用户] JSON 解析成功: {list(analysis_result.keys())}")
             except json.JSONDecodeError as e:
                 logger.warning(f"[分析用户] JSON 解析失败: {e}")
-                logger.warning(f"[分析用户] AI 返回内容前300字: {response[:300]}...")
                 analysis_result = {
                     "summary": response[:200],
                     "investment_style": "未知",
@@ -316,7 +315,7 @@ class AIAnalyzer:
             compare_text = ""
             for user in users_data:
                 compare_text += f"\n\n=== 用户: {user['name']} ===\n"
-                for reply in user['replies'][:10]:  # 每人取 10 条
+                for reply in user['replies'][:10]:
                     compare_text += f"\n[{reply.post_date}] {reply.topic_title}\n{reply.main_content[:300]}\n"
             
             messages = [
@@ -367,7 +366,7 @@ class AIAnalyzer:
             except json.JSONDecodeError:
                 analysis_result = {"summary": response[:500]}
             
-            # 保存报告（使用第一个用户作为 target_id，标记为对比类型）
+            # 保存报告
             report = AIAnalysisReport(
                 target_id=target_ids[0],
                 analysis_type='compare',
@@ -404,7 +403,7 @@ class AIAnalyzer:
         elif time_range == 'month':
             start_date = end_date - timedelta(days=30)
         else:  # all
-            start_date = end_date - timedelta(days=365*10)  # 10 年
+            start_date = end_date - timedelta(days=365*10)
         
         return start_date, end_date
     
@@ -412,11 +411,11 @@ class AIAnalyzer:
         """准备分析文本"""
         text = f"用户: {user_name}\n回复数量: {len(replies)}\n\n"
         
-        for i, reply in enumerate(replies[:20]):  # 最多取 20 条
+        for i, reply in enumerate(replies[:20]):
             text += f"\n--- 回复 {i+1} ---\n"
             text += f"时间: {reply.post_date}\n"
             text += f"主题: {reply.topic_title}\n"
-            text += f"内容: {reply.main_content[:500]}\n"  # 限制单条长度
+            text += f"内容: {reply.main_content[:500]}\n"
         
         return text
     

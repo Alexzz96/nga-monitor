@@ -16,6 +16,24 @@ services:
       - CHECK_INTERVAL=60
       # 时区
       - TZ=Asia/Shanghai
+      # Python 优化
+      - PYTHONUNBUFFERED=1
     restart: unless-stopped
     ports:
       - "12306:12306"
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:12306/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
