@@ -154,6 +154,11 @@ class ReplyArchive(Base):
     url = Column(String(500))     # 链接
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), index=True)
     
+    # 情绪分析字段
+    sentiment = Column(String(20), index=True)  # positive/negative/neutral
+    sentiment_score = Column(Float)  # -1.0 to 1.0
+    sentiment_analyzed_at = Column(DateTime)  # 分析时间
+    
     # 关联
     target = relationship("MonitorTarget")
     
@@ -170,7 +175,54 @@ class ReplyArchive(Base):
             'forum': self.forum,
             'post_date': self.post_date,
             'url': self.url,
-            'created_at': self.created_at.isoformat() if self.created_at else None
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'sentiment': self.sentiment,
+            'sentiment_score': self.sentiment_score,
+            'sentiment_analyzed_at': self.sentiment_analyzed_at.isoformat() if self.sentiment_analyzed_at else None
+        }
+
+
+class SentimentAnalysis(Base):
+    """情绪分析汇总 - 按日期聚合的情绪数据"""
+    __tablename__ = 'sentiment_analysis'
+    
+    id = Column(Integer, primary_key=True)
+    target_id = Column(Integer, ForeignKey('monitor_targets.id'), nullable=False, index=True)
+    date = Column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    
+    # 统计数据
+    total_replies = Column(Integer, default=0)
+    positive_count = Column(Integer, default=0)
+    neutral_count = Column(Integer, default=0)
+    negative_count = Column(Integer, default=0)
+    
+    # 情绪指数 (-1.0 to 1.0)
+    sentiment_index = Column(Float, default=0.0)
+    
+    # 关键词情绪 {keyword: score}
+    keyword_sentiment = Column(Text)  # JSON格式存储
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    # 关联
+    target = relationship("MonitorTarget")
+    
+    def to_dict(self):
+        import json
+        return {
+            'id': self.id,
+            'target_id': self.target_id,
+            'target_name': self.target.name if self.target else None,
+            'date': self.date,
+            'total_replies': self.total_replies,
+            'positive_count': self.positive_count,
+            'neutral_count': self.neutral_count,
+            'negative_count': self.negative_count,
+            'sentiment_index': self.sentiment_index,
+            'keyword_sentiment': json.loads(self.keyword_sentiment) if self.keyword_sentiment else {},
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
 

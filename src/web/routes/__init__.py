@@ -10,6 +10,7 @@ from .archive import router as archive_router
 from .stats import router as stats_router
 from .webhook import router as webhook_router
 from .utils import router as utils_router
+from .analytics import router as analytics_router
 
 # 主 API 路由
 api_router = APIRouter()
@@ -22,5 +23,6 @@ api_router.include_router(archive_router)
 api_router.include_router(stats_router)
 api_router.include_router(webhook_router)
 api_router.include_router(utils_router)
+api_router.include_router(analytics_router)
 
 __all__ = ['api_router']

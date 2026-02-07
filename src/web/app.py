@@ -79,6 +79,12 @@ async def data_page(request: Request):
     return templates.TemplateResponse("data.html", {"request": request})
 
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request):
+    """情绪分析可视化页面"""
+    return templates.TemplateResponse("analytics.html", {"request": request})
+
+
 # ========== 健康检查 ==========
 
 @app.get("/health")
