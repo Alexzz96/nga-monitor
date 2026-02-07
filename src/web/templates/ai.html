@@ -1,657 +1,413 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NGA Monitor - AI 分析</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-            line-height: 1.6;
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        primary: {
+                            DEFAULT: "hsl(var(--primary))",
+                            foreground: "hsl(var(--primary-foreground))",
+                        },
+                        secondary: {
+                            DEFAULT: "hsl(var(--secondary))",
+                            foreground: "hsl(var(--secondary-foreground))",
+                        },
+                        destructive: {
+                            DEFAULT: "hsl(var(--destructive))",
+                            foreground: "hsl(var(--destructive-foreground))",
+                        },
+                        muted: {
+                            DEFAULT: "hsl(var(--muted))",
+                            foreground: "hsl(var(--muted-foreground))",
+                        },
+                        accent: {
+                            DEFAULT: "hsl(var(--accent))",
+                            foreground: "hsl(var(--accent-foreground))",
+                        },
+                        popover: {
+                            DEFAULT: "hsl(var(--popover))",
+                            foreground: "hsl(var(--popover-foreground))",
+                        },
+                        card: {
+                            DEFAULT: "hsl(var(--card))",
+                            foreground: "hsl(var(--card-foreground))",
+                        },
+                    },
+                    borderRadius: {
+                        lg: "var(--radius)",
+                        md: "calc(var(--radius) - 2px)",
+                        sm: "calc(var(--radius) - 4px)",
+                    }
+                }
+            }
         }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
+    </script>
+    <style type="text/tailwindcss">
+        @layer base {
+            :root {
+                --background: 0 0% 100%;
+                --foreground: 222.2 84% 4.9%;
+                --card: 0 0% 100%;
+                --card-foreground: 222.2 84% 4.9%;
+                --popover: 0 0% 100%;
+                --popover-foreground: 222.2 84% 4.9%;
+                --primary: 221.2 83.2% 53.3%;
+                --primary-foreground: 210 40% 98%;
+                --secondary: 210 40% 96.1%;
+                --secondary-foreground: 222.2 47.4% 11.2%;
+                --muted: 210 40% 96.1%;
+                --muted-foreground: 215.4 16.3% 46.9%;
+                --accent: 210 40% 96.1%;
+                --accent-foreground: 222.2 47.4% 11.2%;
+                --destructive: 0 84.2% 60.2%;
+                --destructive-foreground: 210 40% 98%;
+                --border: 214.3 31.8% 91.4%;
+                --input: 214.3 31.8% 91.4%;
+                --ring: 221.2 83.2% 53.3%;
+                --radius: 0.75rem;
+            }
+            .dark {
+                --background: 222.2 84% 4.9%;
+                --foreground: 210 40% 98%;
+                --card: 222.2 84% 4.9%;
+                --card-foreground: 210 40% 98%;
+                --popover: 222.2 84% 4.9%;
+                --popover-foreground: 210 40% 98%;
+                --primary: 217.2 91.2% 59.8%;
+                --primary-foreground: 222.2 47.4% 11.2%;
+                --secondary: 217.2 32.6% 17.5%;
+                --secondary-foreground: 210 40% 98%;
+                --muted: 217.2 32.6% 17.5%;
+                --muted-foreground: 215 20.2% 65.1%;
+                --accent: 217.2 32.6% 17.5%;
+                --accent-foreground: 210 40% 98%;
+                --destructive: 0 62.8% 30.6%;
+                --destructive-foreground: 210 40% 98%;
+                --border: 217.2 32.6% 17.5%;
+                --input: 217.2 32.6% 17.5%;
+                --ring: 224.3 76.3% 48%;
+            }
         }
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #9b59b6;
-            padding-bottom: 10px;
-        }
-        .nav {
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #3498db;
-            text-decoration: none;
-            margin-right: 20px;
-        }
-        .nav a:hover {
-            text-decoration: none;
-        }
-        .nav-btn {
-            padding: 8px 16px;
-            border-radius: 4px;
-            background: #f8f9fa;
-            color: #555;
-            font-weight: 500;
-            transition: all 0.3s;
-            text-decoration: none;
-            margin-right: 0;
-        }
-        .nav-btn:hover {
-            background: #e9ecef;
-        }
-        .nav-btn.active {
-            background: #9b59b6;
-            color: white;
-        }
-        .card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .card h2 {
-            font-size: 18px;
-            margin-bottom: 15px;
-            color: #34495e;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #555;
-        }
-        input[type="text"], input[type="url"], input[type="number"], select, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-        textarea {
-            min-height: 120px;
-            resize: vertical;
-        }
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #9b59b6;
-        }
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-        }
-        .btn-primary {
-            background: #9b59b6;
-            color: white;
-        }
-        .btn-primary:hover { background: #8e44ad; }
-        .btn-success {
-            background: #27ae60;
-            color: white;
-        }
-        .btn-success:hover { background: #229954; }
-        .btn-danger {
-            background: #e74c3c;
-            color: white;
-        }
-        .btn-danger:hover { background: #c0392b; }
-        .btn-secondary {
-            background: #95a5a6;
-            color: white;
-        }
-        .btn-secondary:hover { background: #7f8c8d; }
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 12px;
-        }
-        .flex {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .flex-grow { flex: 1; }
-        .hidden { display: none; }
-        .alert {
-            padding: 12px 15px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .grid-2 {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-        @media (max-width: 768px) {
-            .grid-2 { grid-template-columns: 1fr; }
-        }
-        .checkbox-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            padding: 8px 12px;
-            background: #f8f9fa;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .checkbox-item:hover {
-            background: #e9ecef;
-        }
-        .checkbox-item input {
-            cursor: pointer;
-        }
-        .report-card {
-            background: #f8f9fa;
-            border-left: 4px solid #9b59b6;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-        }
-        .report-card h4 {
-            margin-bottom: 10px;
-            color: #2c3e50;
-        }
-        .tag {
-            display: inline-block;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-right: 5px;
-            margin-bottom: 5px;
-        }
-        .tag-purple {
-            background: #e8daef;
-            color: #6c3483;
-        }
-        .tag-blue {
-            background: #d6eaf8;
-            color: #2874a6;
-        }
-        .tag-green {
-            background: #d5f4e6;
-            color: #1e8449;
-        }
-        .tag-orange {
-            background: #fdebd0;
-            color: #b7950b;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 20px;
-        }
-        .loading.active {
-            display: block;
-        }
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #9b59b6;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 10px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .result-box {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 15px;
-            margin-top: 15px;
-            white-space: pre-wrap;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 13px;
-            max-height: 500px;
-            overflow-y: auto;
+        @layer base {
+            * { @apply border-border; }
+            body { @apply bg-background text-foreground; }
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body>
-    <div class="container">
-        <h1>🤖 AI 分析中心</h1>
-        
-        <div class="nav" style="margin-bottom: 20px; display: flex; gap: 10px;">
-            <a href="/" class="nav-btn">📡 监控管理</a>
-            <a href="/ai" class="nav-btn active">🤖 AI 分析</a>
-            <a href="/data" class="nav-btn">📊 数据管理</a>
-        </div>
-        
-        <div id="alert" class="alert hidden"></div>
-        
-        <!-- AI 配置 -->
-        <div class="card">
-            <h2>⚙️ AI 配置</h2>
-            
-            <div class="grid-2">
-                <div class="form-group">
-                    <label>AI 提供商</label>
-                    <select id="ai-provider">
-                        <option value="kimi">Kimi (Moonshot)</option>
-                        <option value="openai">OpenAI</option>
-                    </select>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <!-- 顶部导航 -->
+    <nav class="sticky top-0 z-50 w-full border-b bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
+        <div class="container mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white shadow-lg">
+                    <i class="fas fa-robot text-lg"></i>
                 </div>
-                
-                <div class="form-group">
-                    <label>模型名称</label>
-                    <div class="flex">
-                        <input type="text" id="ai-model" placeholder="moonshot-v1-8k 或 gpt-4" class="flex-grow">
-                        <button type="button" class="btn btn-secondary" onclick="fetchModels()" style="margin-left: 10px; white-space: nowrap;">获取可用模型</button>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">AI 分析</h1>
+                    <p class="text-xs text-muted-foreground">智能投资风格分析</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <a href="/" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all text-muted-foreground hover:bg-secondary">
+                    <i class="fas fa-satellite-dish mr-2"></i>监控
+                </a>
+                <a href="/ai" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-all bg-primary text-primary-foreground shadow-md">
+                    <i class="fas fa-robot mr-2"></i>AI分析
+                </a>
+                <a href="/data" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all text-muted-foreground hover:bg-secondary">
+                    <i class="fas fa-database mr-2"></i>数据
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- 提示框 -->
+        <div id="alert" class="hidden fixed top-20 right-4 z-50 max-w-md"></div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <!-- 左侧：AI 配置 -->
+            <div class="space-y-6">
+                <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-6 border-b bg-gradient-to-r from-purple-500/10 to-pink-500/10">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-cog text-purple-500"></i>
+                            AI 配置
+                        </h2>
                     </div>
-                </div>
-            </div>
-            
-            <!-- 模型选择弹窗 -->
-            <div id="models-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-                <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; max-height: 70vh; width: 90%; overflow: auto;">
-                    <h3 style="margin-bottom: 15px;">选择模型</h3>
-                    <div id="models-list" style="margin-bottom: 15px;">
-                        <p>加载中...</p>
+                    <div class="p-6 space-y-4" id="ai-config">
+                        <!-- 动态加载 -->
                     </div>
-                    <button class="btn btn-secondary" onclick="closeModelsModal()">关闭</button>
-                </div>
+                </section>
+
+                <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-6 border-b">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-file-alt text-blue-500"></i>
+                            提示词模板
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <div id="templates-list" class="space-y-2">
+                            <!-- 动态加载 -->
+                        </div>
+                    </div>
+                </section>
             </div>
-            
-            <div class="form-group">
-                <label>API Base URL</label>
-                <input type="url" id="ai-base-url" placeholder="https://api.moonshot.cn/v1">
+
+            <!-- 中间：分析操作 -->
+            <div class="space-y-6">
+                <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-6 border-b bg-gradient-to-r from-green-500/10 to-emerald-500/10">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-user-check text-green-500"></i>
+                            单用户分析
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="text-sm font-medium">选择用户</label>
+                            <select id="single-target" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
+                                <!-- 动态加载 -->
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">时间范围</label>
+                            <select id="single-time-range" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
+                                <option value="week">最近一周</option>
+                                <option value="month">最近一月</option>
+                                <option value="all">全部历史</option>
+                            </select>
+                        </div>
+                        <button onclick="analyzeSingle()" class="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg transition-all">
+                            <i class="fas fa-play mr-2"></i>开始分析
+                        </button>
+                    </div>
+                </section>
+
+                <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-6 border-b bg-gradient-to-r from-orange-500/10 to-red-500/10">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-users text-orange-500"></i>
+                            用户对比
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="text-sm font-medium">选择用户（至少2个）</label>
+                            <div id="compare-targets" class="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                                <!-- 动态加载 -->
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">时间范围</label>
+                            <select id="compare-time-range" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
+                                <option value="week">最近一周</option>
+                                <option value="month">最近一月</option>
+                                <option value="all">全部历史</option>
+                            </select>
+                        </div>
+                        <button onclick="compareUsers()" class="w-full px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg font-medium hover:shadow-lg transition-all">
+                            <i class="fas fa-chart-bar mr-2"></i>开始对比
+                        </button>
+                    </div>
+                </section>
             </div>
-            
-            <div class="form-group">
-                <label>API Key</label>
-                <input type="text" id="ai-api-key" placeholder="输入你的 API Key">
-                <p style="font-size: 12px; color: #666; margin-top: 5px;"
-                   id="api-key-hint">如果已配置，留空则保持原有设置</p>
-            </div>
-            
-            <!-- 提示词模板选择 -->
-            <div class="form-group" style="background: #f8f9fa; padding: 15px; border-radius: 8px; border-left: 4px solid #9b59b6;">
-                <label style="color: #9b59b6; font-weight: bold;">📝 提示词模板（快速配置）</label>
-                <div class="flex" style="margin-top: 10px;">
-                    <select id="prompt-template" class="flex-grow" onchange="applyPromptTemplate()">
-                        <option value="">-- 选择模板 --</option>
-                    </select>
-                    <button type="button" class="btn btn-secondary" onclick="loadPromptTemplates()" style="margin-left: 10px;">刷新</button>
-                </div>
-                <p style="font-size: 12px; color: #666; margin-top: 8px;">
-                    选择模板将自动填充下方的系统提示词和分析提示词。您也可以在此基础上手动修改。
-                </p>
-            </div>
-            
-            <div class="form-group">
-                <label>系统提示词 (System Prompt)</label>
-                <textarea id="ai-system-prompt" placeholder="定义 AI 的角色和基本行为..."></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label>分析提示词 (Analysis Prompt)</label>
-                <textarea id="ai-analysis-prompt" placeholder="定义分析任务的具体要求..."></textarea>
-                <p style="font-size: 12px; color: #666; margin-top: 5px;"
-                   >可用变量: {user_name} (用户名), {content} (回复内容)</p>
-            </div>
-            
-            <div class="flex">
-                <button class="btn btn-primary" onclick="saveAIConfig()">保存配置</button>
-                <button class="btn btn-secondary" onclick="loadAIConfig()">刷新配置</button>
-            </div>
-        </div>
-        
-        <!-- 单用户分析 -->
-        <div class="card">
-            <h2>👤 单用户分析</h2>
-            
-            <div class="form-group">
-                <label>选择监控目标</label>
-                <div class="checkbox-group" id="single-targets">
-                    <!-- 动态生成 -->
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>时间范围</label>
-                <select id="single-time-range">
-                    <option value="week">本周 (最近7天)</option>
-                    <option value="month">本月 (最近30天)</option>
-                    <option value="all">全部历史</option>
-                </select>
-            </div>
-            
-            <button class="btn btn-success" onclick="analyzeSingle()">开始分析</button>
-            
-            <div class="loading" id="single-loading">
-                <div class="spinner"></div>
-                <p>AI 正在分析中，请稍候...</p>
-            </div>
-            
-            <div id="single-result"></div>
-        </div>
-        
-        <!-- 多用户对比 -->
-        <div class="card">
-            <h2>👥 多用户对比</h2>
-            
-            <div class="form-group">
-                <label>选择对比用户（至少2个）</label>
-                <div class="checkbox-group" id="compare-targets">
-                    <!-- 动态生成 -->
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>时间范围</label>
-                <select id="compare-time-range">
-                    <option value="week">本周 (最近7天)</option>
-                    <option value="month">本月 (最近30天)</option>
-                    <option value="all">全部历史</option>
-                </select>
-            </div>
-            
-            <button class="btn btn-success" onclick="analyzeCompare()">开始对比</button>
-            
-            <div class="loading" id="compare-loading">
-                <div class="spinner"></div>
-                <p>AI 正在对比分析中，请稍候...</p>
-            </div>
-            
-            <div id="compare-result"></div>
-        </div>
-        
-        <!-- 历史报告 -->
-        <div class="card">
-            <h2>📚 历史分析报告</h2>
-            <div id="reports-list">
-                <p>加载中...</p>
+
+            <!-- 右侧：历史报告 -->
+            <div>
+                <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-6 border-b bg-gradient-to-r from-blue-500/10 to-cyan-500/10">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-history text-blue-500"></i>
+                            历史报告
+                        </h2>
+                    </div>
+                    <div class="p-6">
+                        <div id="reports-list" class="space-y-3 max-h-[600px] overflow-y-auto">
+                            <!-- 动态加载 -->
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
-    </div>
-    
+
+        <!-- 分析结果弹窗 -->
+        <div id="result-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-card rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden">
+                <div class="p-6 border-b flex items-center justify-between">
+                    <h3 class="text-xl font-semibold" id="modal-title">分析报告</h3>
+                    <button onclick="closeModal()" class="p-2 rounded-lg hover:bg-muted transition-all">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[60vh]" id="modal-content">
+                    <!-- 动态内容 -->
+                </div>
+                <div class="p-6 border-t flex justify-end">
+                    <button onclick="closeModal()" class="px-4 py-2 bg-secondary rounded-lg hover:bg-secondary/80 transition-all">关闭</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
     <script>
-        // 页面加载
-        document.addEventListener('DOMContentLoaded', function() {
-            loadAIConfig();
-            loadTargets();
-            loadReports();
-            loadPromptTemplates();
-        });
-
-        // ========== 提示词模板 ==========
-
-        async function loadPromptTemplates() {
-            try {
-                const res = await fetch('/api/ai/templates');
-                const data = await res.json();
-
-                const select = document.getElementById('prompt-template');
-                // 保留第一个选项
-                const firstOption = select.options[0];
-                select.innerHTML = '';
-                select.appendChild(firstOption);
-
-                for (const template of data.templates) {
-                    const option = document.createElement('option');
-                    option.value = template.id;
-                    option.textContent = template.name;
-                    select.appendChild(option);
-                }
-            } catch (e) {
-                console.error('加载模板失败:', e);
-            }
-        }
-
-        async function applyPromptTemplate() {
-            const templateId = document.getElementById('prompt-template').value;
-            if (!templateId) return;
-
-            if (!confirm('应用模板将覆盖当前的系统提示词和分析提示词，是否继续？')) {
-                document.getElementById('prompt-template').value = '';
-                return;
-            }
-
-            try {
-                const res = await fetch(`/api/ai/templates/${templateId}`);
-                const data = await res.json();
-
-                if (res.ok) {
-                    document.getElementById('ai-system-prompt').value = data.system_prompt;
-                    document.getElementById('ai-analysis-prompt').value = data.analysis_prompt;
-                    showAlert(`已应用模板：${data.name}`);
-                } else {
-                    showAlert('加载模板失败', 'error');
-                }
-            } catch (e) {
-                showAlert('请求失败', 'error');
-            }
-        }
-        
+        // 显示提示
         function showAlert(message, type = 'success') {
             const alert = document.getElementById('alert');
-            alert.textContent = message;
-            alert.className = 'alert alert-' + type;
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500'
+            };
+            alert.innerHTML = `
+                <div class="${colors[type]} text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-in slide-in-from-right">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-exclamation-triangle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `;
             alert.classList.remove('hidden');
             setTimeout(() => alert.classList.add('hidden'), 5000);
         }
-        
-        // ========== AI 配置 ==========
-        
+
+        // 加载 AI 配置
         async function loadAIConfig() {
             try {
                 const res = await fetch('/api/ai/config');
                 const config = await res.json();
                 
-                document.getElementById('ai-provider').value = config.provider || 'kimi';
-                document.getElementById('ai-model').value = config.model || '';
-                document.getElementById('ai-base-url').value = config.base_url || '';
-                document.getElementById('ai-system-prompt').value = config.system_prompt || '';
-                document.getElementById('ai-analysis-prompt').value = config.analysis_prompt || '';
-                
-                if (config.api_key_masked) {
-                    document.getElementById('ai-api-key').placeholder = `已配置: ${config.api_key_masked}`;
-                }
+                document.getElementById('ai-config').innerHTML = `
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                            <span class="text-sm text-muted-foreground">提供商</span>
+                            <span class="font-medium">${config.provider || 'kimi'}</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                            <span class="text-sm text-muted-foreground">模型</span>
+                            <span class="font-medium">${config.model || 'moonshot-v1-8k'}</span>
+                        </div>
+                        <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                            <span class="text-sm text-muted-foreground">API Key</span>
+                            <span class="font-medium">${config.api_key_masked || '未配置'}</span>
+                        </div>
+                    </div>
+                    <div class="pt-4 border-t">
+                        <p class="text-xs text-muted-foreground">如需修改配置，请通过 API 或直接修改数据库</p>
+                    </div>
+                `;
             } catch (e) {
                 console.error('加载 AI 配置失败:', e);
             }
         }
-        
-        async function saveAIConfig() {
-            const apiKey = document.getElementById('ai-api-key').value.trim();
-            
-            const config = {
-                provider: document.getElementById('ai-provider').value,
-                model: document.getElementById('ai-model').value.trim(),
-                base_url: document.getElementById('ai-base-url').value.trim(),
-                system_prompt: document.getElementById('ai-system-prompt').value.trim(),
-                analysis_prompt: document.getElementById('ai-analysis-prompt').value.trim()
-            };
-            
-            // 如果有输入新的 API Key，则更新
-            if (apiKey) {
-                config.api_key = apiKey;
-            }
-            
+
+        // 加载提示词模板
+        async function loadTemplates() {
             try {
-                const res = await fetch('/api/ai/config', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(config)
-                });
-                
-                if (res.ok) {
-                    showAlert('AI 配置已保存');
-                    document.getElementById('ai-api-key').value = '';
-                    loadAIConfig();
-                } else {
-                    showAlert('保存失败', 'error');
-                }
-            } catch (e) {
-                showAlert('请求失败', 'error');
-            }
-        }
-        
-        // ========== 获取可用模型 ==========
-        
-        async function fetchModels() {
-            const baseUrl = document.getElementById('ai-base-url').value.trim();
-            const apiKey = document.getElementById('ai-api-key').value.trim();
-            const provider = document.getElementById('ai-provider').value;
-            
-            // 显示弹窗
-            document.getElementById('models-modal').style.display = 'flex';
-            document.getElementById('models-list').innerHTML = '<div class="spinner"></div><p>正在获取模型列表...</p>';
-            
-            try {
-                const res = await fetch('/api/ai/models', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        provider: provider,
-                        base_url: baseUrl,
-                        api_key: apiKey
-                    })
-                });
-                
+                const res = await fetch('/api/ai/templates');
                 const data = await res.json();
                 
-                if (res.ok && data.success) {
-                    renderModelsList(data.models);
-                } else {
-                    document.getElementById('models-list').innerHTML = `
-                        <div class="alert alert-error">
-                            <strong>获取失败:</strong> ${data.detail || '未知错误'}
+                document.getElementById('templates-list').innerHTML = data.templates.map(t => `
+                    <div class="p-3 rounded-lg border hover:bg-muted/50 transition-all cursor-pointer" onclick="viewTemplate('${t.id}')">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium">${t.name}</span>
+                            <i class="fas fa-chevron-right text-muted-foreground text-sm"></i>
                         </div>
-                    `;
-                }
+                    </div>
+                `).join('');
             } catch (e) {
-                document.getElementById('models-list').innerHTML = `
-                    <div class="alert alert-error">
-                        <strong>请求失败:</strong> ${e.message}
-                    </div>
-                `;
+                console.error('加载模板失败:', e);
             }
         }
-        
-        function renderModelsList(models) {
-            if (models.length === 0) {
-                document.getElementById('models-list').innerHTML = '<p>未找到可用模型</p>';
-                return;
-            }
-            
-            let html = '<div style="max-height: 400px; overflow-y: auto;">';
-            
-            models.forEach(model => {
-                html += `
-                    <div style="padding: 10px; border-bottom: 1px solid #eee; cursor: pointer;" 
-                         onmouseover="this.style.background='#f5f5f5'" 
-                         onmouseout="this.style.background='white'"
-                         onclick="selectModel('${model.id}')">
-                        <strong>${model.id}</strong>
-                        <span style="color: #666; font-size: 12px; margin-left: 10px;">${model.owned_by}</span>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-            html += `<p style="margin-top: 10px; font-size: 12px; color: #666;">共 ${models.length} 个模型，点击选择</p>`;
-            
-            document.getElementById('models-list').innerHTML = html;
-        }
-        
-        function selectModel(modelId) {
-            document.getElementById('ai-model').value = modelId;
-            closeModelsModal();
-            showAlert(`已选择模型: ${modelId}`);
-        }
-        
-        function closeModelsModal() {
-            document.getElementById('models-modal').style.display = 'none';
-        }
-        
-        // ========== 目标选择 ==========
-        
+
+        // 加载监控目标
         async function loadTargets() {
             try {
                 const res = await fetch('/api/targets');
                 const data = await res.json();
                 
-                const singleContainer = document.getElementById('single-targets');
-                const compareContainer = document.getElementById('compare-targets');
-                const archiveContainer = document.getElementById('archive-targets');
+                // 单用户选择
+                document.getElementById('single-target').innerHTML = 
+                    '<option value="">请选择用户</option>' +
+                    data.targets.map(t => `<option value="${t.id}">${t.name || t.uid} (${t.uid})</option>`).join('');
                 
-                const html = data.targets.map(t => `
-                    <label class="checkbox-item">
-                        <input type="radio" name="single-target" value="${t.id}" data-name="${t.name}">
-                        <span>${t.name || t.uid}</span>
+                // 多用户选择
+                document.getElementById('compare-targets').innerHTML = data.targets.map(t => `
+                    <label class="flex items-center gap-2 p-2 rounded-lg border hover:bg-muted/50 cursor-pointer transition-all">
+                        <input type="checkbox" value="${t.id}" class="compare-target-checkbox rounded">
+                        <span class="text-sm">${t.name || t.uid}</span>
                     </label>
                 `).join('');
-                
-                singleContainer.innerHTML = html;
-                
-                const compareHtml = data.targets.map(t => `
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="compare-target" value="${t.id}" data-name="${t.name}">
-                        <span>${t.name || t.uid}</span>
-                    </label>
-                `).join('');
-                
-                compareContainer.innerHTML = compareHtml;
-                
             } catch (e) {
                 console.error('加载目标失败:', e);
             }
         }
-        
-        // ========== 单用户分析 ==========
-        
+
+        // 加载历史报告
+        async function loadReports() {
+            try {
+                const res = await fetch('/api/ai/reports');
+                const data = await res.json();
+                
+                if (!data.reports || data.reports.length === 0) {
+                    document.getElementById('reports-list').innerHTML = `
+                        <div class="text-center py-8 text-muted-foreground">
+                            <i class="fas fa-inbox text-4xl mb-2 opacity-50"></i>
+                            <p>暂无分析报告</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                document.getElementById('reports-list').innerHTML = data.reports.slice(0, 10).map(r => `
+                    <div class="p-4 rounded-xl border hover:shadow-md transition-all cursor-pointer ${r.analysis_type === 'compare' ? 'bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20' : 'bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20'}" 
+                         onclick="viewReport(${r.id})">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded-full ${r.analysis_type === 'compare' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}">
+                                        ${r.analysis_type === 'compare' ? '对比' : '单用户'}
+                                    </span>
+                                    <span class="text-xs text-muted-foreground">${new Date(r.created_at).toLocaleDateString('zh-CN')}</span>
+                                </div>
+                                <p class="font-medium text-sm">${r.target_name || '未知用户'}</p>
+                                <p class="text-xs text-muted-foreground mt-1">${r.summary ? r.summary.substring(0, 50) + '...' : '无摘要'}</p>
+                            </div>
+                            <button onclick="event.stopPropagation(); deleteReport(${r.id})" class="p-2 rounded-lg hover:bg-red-100 text-red-500 transition-all">
+                                <i class="fas fa-trash-alt text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('加载报告失败:', e);
+            }
+        }
+
+        // 单用户分析
         async function analyzeSingle() {
-            const selected = document.querySelector('input[name="single-target"]:checked');
-            if (!selected) {
-                showAlert('请选择一个监控目标', 'error');
+            const targetId = document.getElementById('single-target').value;
+            const timeRange = document.getElementById('single-time-range').value;
+            
+            if (!targetId) {
+                showAlert('请选择用户', 'error');
                 return;
             }
             
-            const targetId = parseInt(selected.value);
-            const timeRange = document.getElementById('single-time-range').value;
-            
-            document.getElementById('single-loading').classList.add('active');
-            document.getElementById('single-result').innerHTML = '';
+            showAlert('分析中，请稍候...', 'warning');
             
             try {
                 const res = await fetch(`/api/ai/analyze/${targetId}`, {
@@ -660,67 +416,32 @@
                     body: JSON.stringify({time_range: timeRange})
                 });
                 
-                const data = await res.json();
-                
                 if (res.ok) {
-                    renderSingleResult(data);
+                    const data = await res.json();
+                    showAlert('分析完成');
+                    viewReport(data.report_id);
                     loadReports();
                 } else {
-                    showAlert(data.detail || '分析失败', 'error');
+                    const err = await res.json();
+                    showAlert(err.detail || '分析失败', 'error');
                 }
             } catch (e) {
                 showAlert('请求失败', 'error');
-            } finally {
-                document.getElementById('single-loading').classList.remove('active');
             }
         }
-        
-        function renderSingleResult(data) {
-            const analysis = data.analysis;
-            let html = `
-                <div class="report-card">
-                    <h4>📊 ${data.target_name} - ${data.time_range === 'week' ? '本周' : data.time_range === 'month' ? '本月' : '全部'}分析报告</h4>
-                    <p><strong>整体评价:</strong> ${analysis.summary || '无'}</p>
-                    <p><strong>投资风格:</strong> ${analysis.investment_style || '未知'}</p>
-                    <p><strong>风险偏好:</strong> ${analysis.risk_preference || '未知'}</p>
-                    <p><strong>情绪倾向:</strong> ${analysis.sentiment || '未知'}</p>
-                    
-                    <p style="margin-top: 10px;"><strong>关注领域:</strong></p>
-                    <div>
-                        ${(analysis.focus_areas || []).map(a => `<span class="tag tag-purple">${a}</span>`).join('')}
-                    </div>
-                    
-                    <p style="margin-top: 10px;"><strong>提及标的:</strong></p>
-                    <div>
-                        ${(analysis.key_stocks || []).map(s => `<span class="tag tag-blue">${s}</span>`).join('')}
-                    </div>
-                    
-                    <p style="margin-top: 10px;"><strong>特点标签:</strong></p>
-                    <div>
-                        ${(analysis.characteristics || []).map(c => `<span class="tag tag-green">${c}</span>`).join('')}
-                    </div>
-                    
-                    ${analysis.recommendation ? `<p style="margin-top: 10px;"><strong>建议:</strong> ${analysis.recommendation}</p>` : ''}
-                </div>
-            `;
+
+        // 用户对比
+        async function compareUsers() {
+            const checkboxes = document.querySelectorAll('.compare-target-checkbox:checked');
+            const targetIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+            const timeRange = document.getElementById('compare-time-range').value;
             
-            document.getElementById('single-result').innerHTML = html;
-        }
-        
-        // ========== 多用户对比 ==========
-        
-        async function analyzeCompare() {
-            const selected = document.querySelectorAll('input[name="compare-target"]:checked');
-            if (selected.length < 2) {
-                showAlert('请至少选择 2 个监控目标', 'error');
+            if (targetIds.length < 2) {
+                showAlert('请至少选择 2 个用户', 'error');
                 return;
             }
             
-            const targetIds = Array.from(selected).map(s => parseInt(s.value));
-            const timeRange = document.getElementById('compare-time-range').value;
-            
-            document.getElementById('compare-loading').classList.add('active');
-            document.getElementById('compare-result').innerHTML = '';
+            showAlert('对比分析中，请稍候...', 'warning');
             
             try {
                 const res = await fetch('/api/ai/compare', {
@@ -729,117 +450,107 @@
                     body: JSON.stringify({target_ids: targetIds, time_range: timeRange})
                 });
                 
-                const data = await res.json();
-                
                 if (res.ok) {
-                    renderCompareResult(data);
+                    const data = await res.json();
+                    showAlert('对比完成');
+                    viewReport(data.report_id);
                     loadReports();
                 } else {
-                    showAlert(data.detail || '对比分析失败', 'error');
+                    const err = await res.json();
+                    showAlert(err.detail || '对比失败', 'error');
                 }
             } catch (e) {
                 showAlert('请求失败', 'error');
-            } finally {
-                document.getElementById('compare-loading').classList.remove('active');
             }
         }
-        
-        function renderCompareResult(data) {
-            const analysis = data.analysis;
-            let html = `
-                <div class="report-card">
-                    <h4>📊 对比分析: ${data.users.join(' vs ')}</h4>
-                    <p><strong>整体总结:</strong> ${analysis.summary || '无'}</p>
-                    
-                    ${analysis.comparisons ? analysis.comparisons.map(c => `
-                        <div style="margin-top: 15px; padding: 10px; background: white; border-radius: 4px;">
-                            <p><strong>${c.user}</strong></p>
-                            <p>风格: ${c.style || '未知'}</p>
-                            ${c.strengths ? `<p>优势: ${c.strengths.join(', ')}</p>` : ''}
-                            ${c.weaknesses ? `<p>不足: ${c.weaknesses.join(', ')}</p>` : ''}
-                        </div>
-                    `).join('') : ''}
-                    
-                    ${analysis.similarities ? `
-                        <p style="margin-top: 10px;"><strong>共同点:</strong></p>
-                        <ul>${analysis.similarities.map(s => `<li>${s}</li>`).join('')}</ul>
-                    ` : ''}
-                    
-                    ${analysis.differences ? `
-                        <p style="margin-top: 10px;"><strong>差异点:</strong></p>
-                        <ul>${analysis.differences.map(d => `<li>${d}</li>`).join('')}</ul>
-                    ` : ''}
-                    
-                    ${analysis.recommendations ? `<p style="margin-top: 10px;"><strong>建议:</strong> ${analysis.recommendations}</p>` : ''}
-                </div>
-            `;
-            
-            document.getElementById('compare-result').innerHTML = html;
-        }
-        
-        // ========== 历史报告 ==========
-        
-        async function loadReports() {
-            try {
-                const res = await fetch('/api/ai/reports?limit=10');
-                const data = await res.json();
-                
-                if (data.reports.length === 0) {
-                    document.getElementById('reports-list').innerHTML = '<p>暂无分析报告</p>';
-                    return;
-                }
-                
-                const html = data.reports.map(r => `
-                    <div class="report-card" style="display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <h4>${r.target_name} - ${r.time_range === 'week' ? '本周' : r.time_range === 'month' ? '本月' : '全部'}${r.analysis_type === 'compare' ? '对比' : ''}分析</h4>
-                            <p style="font-size: 12px; color: #666;">
-                                ${new Date(r.created_at).toLocaleString()} | 
-                                ${r.summary ? r.summary.substring(0, 100) + '...' : '无摘要'}
-                            </p>
-                        </div>
-                        <div>
-                            <button class="btn btn-secondary btn-sm" onclick="viewReport(${r.id})">查看</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteReport(${r.id})">删除</button>
-                        </div>
-                    </div>
-                `).join('');
-                
-                document.getElementById('reports-list').innerHTML = html;
-            } catch (e) {
-                console.error('加载报告失败:', e);
-            }
-        }
-        
+
+        // 查看报告
         async function viewReport(reportId) {
             try {
                 const res = await fetch(`/api/ai/reports/${reportId}`);
                 const data = await res.json();
                 
-                if (res.ok) {
-                    const resultDiv = document.createElement('div');
-                    resultDiv.className = 'result-box';
-                    resultDiv.innerHTML = `<h4>${data.target_name} - 完整报告</h4><pre>${JSON.stringify(data.report_content, null, 2)}</pre>`;
+                document.getElementById('modal-title').textContent = `${data.target_name} - 分析报告`;
+                
+                let content = '';
+                if (data.report_content) {
+                    const report = typeof data.report_content === 'string' ? JSON.parse(data.report_content) : data.report_content;
                     
-                    // 在弹窗或页面底部显示
-                    const modal = document.createElement('div');
-                    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;';
-                    modal.innerHTML = `
-                        <div style="background: white; padding: 20px; border-radius: 8px; max-width: 800px; max-height: 80vh; overflow: auto;">
-                            ${resultDiv.outerHTML}
-                            <button class="btn btn-secondary" onclick="this.closest('.modal').remove()" style="margin-top: 15px;">关闭</button>
+                    content = `
+                        <div class="space-y-6">
+                            <div class="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20">
+                                <h4 class="font-semibold mb-2">总结</h4>
+                                <p class="text-muted-foreground">${report.summary || '无'}</p>
+                            </div>
+                            
+                            ${report.investment_style ? `
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="p-4 rounded-xl border">
+                                    <span class="text-sm text-muted-foreground">投资风格</span>
+                                    <p class="font-medium mt-1">${report.investment_style}</p>
+                                </div>
+                                <div class="p-4 rounded-xl border">
+                                    <span class="text-sm text-muted-foreground">风险偏好</span>
+                                    <p class="font-medium mt-1">${report.risk_preference}</p>
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${report.focus_areas && report.focus_areas.length > 0 ? `
+                            <div>
+                                <h4 class="font-semibold mb-2">关注领域</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    ${report.focus_areas.map(area => `<span class="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">${area}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                            
+                            ${report.recommendation ? `
+                            <div class="p-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+                                <h4 class="font-semibold mb-2">建议</h4>
+                                <p class="text-muted-foreground">${report.recommendation}</p>
+                            </div>
+                            ` : ''}
                         </div>
                     `;
-                    modal.className = 'modal';
-                    document.body.appendChild(modal);
                 }
+                
+                document.getElementById('modal-content').innerHTML = content;
+                document.getElementById('result-modal').classList.remove('hidden');
             } catch (e) {
-                showAlert('查看报告失败', 'error');
+                console.error('加载报告详情失败:', e);
+                showAlert('加载报告失败', 'error');
             }
         }
-        
+
+        // 查看模板详情
+        async function viewTemplate(templateId) {
+            try {
+                const res = await fetch(`/api/ai/templates/${templateId}`);
+                const data = await res.json();
+                
+                document.getElementById('modal-title').textContent = data.name;
+                document.getElementById('modal-content').innerHTML = `
+                    <div class="space-y-4">
+                        <div>
+                            <h4 class="font-semibold mb-2">系统提示词</h4>
+                            <pre class="p-4 rounded-lg bg-muted text-sm overflow-x-auto whitespace-pre-wrap">${data.system_prompt}</pre>
+                        </div>
+                        <div>
+                            <h4 class="font-semibold mb-2">分析提示词</h4>
+                            <pre class="p-4 rounded-lg bg-muted text-sm overflow-x-auto whitespace-pre-wrap">${data.analysis_prompt}</pre>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('result-modal').classList.remove('hidden');
+            } catch (e) {
+                showAlert('加载模板失败', 'error');
+            }
+        }
+
+        // 删除报告
         async function deleteReport(reportId) {
-            if (!confirm('确定要删除这个报告吗？')) return;
+            if (!confirm('确定要删除这份报告吗？')) return;
             
             try {
                 const res = await fetch(`/api/ai/reports/${reportId}`, {method: 'DELETE'});
@@ -851,6 +562,19 @@
                 showAlert('删除失败', 'error');
             }
         }
+
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('result-modal').classList.add('hidden');
+        }
+
+        // 页面加载
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAIConfig();
+            loadTemplates();
+            loadTargets();
+            loadReports();
+        });
     </script>
 </body>
 </html>
