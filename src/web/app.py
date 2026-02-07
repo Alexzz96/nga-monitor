@@ -25,6 +25,10 @@ templates = Jinja2Templates(directory="/app/src/web/templates")
 # 注册 API 路由
 app.include_router(api_router)
 
+# 向后兼容：旧版解析 URL 端点
+from web.routes.utils import parse_url
+app.post("/api/parse-url")(parse_url)
+
 STORAGE_STATE_PATH = Path(os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.json'))
 
 
