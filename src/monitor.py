@@ -5,6 +5,7 @@
 """
 
 import os
+import re
 import logging
 from datetime import datetime, timezone
 
@@ -20,6 +21,58 @@ STORAGE_STATE_PATH = os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.js
 DEBUG_MODE = os.getenv('DEBUG', 'false').lower() == 'true'
 logger = logging.getLogger(__name__)
 
+
+def check_keywords(content: str, keywords: str, mode: str = 'ANY') -> bool:
+    """
+    检查内容是否匹配关键词
+    
+    Args:
+        content: 回复内容
+        keywords: 关键词列表，逗号分隔
+        mode: ANY(匹配任一), ALL(匹配全部), REGEX(正则匹配)
+        
+    Returns:
+        bool: 是否匹配
+    """
+    if not keywords or not keywords.strip():
+        return True  # 未设置关键词，全部通过
+    
+    if not content:
+        content = ''
+    
+    keyword_list = [k.strip() for k in keywords.split(',') if k.strip()]
+    
+    if not keyword_list:
+        return True
+    
+    content_lower = content.lower()
+    
+    if mode == 'REGEX':
+        # 正则模式
+        for pattern in keyword_list:
+            try:
+                if re.search(pattern, content, re.IGNORECASE):
+                    return True
+            except re.error:
+                logger.warning(f"无效的正则表达式: {pattern}")
+                continue
+        return False
+    
+    elif mode == 'ALL':
+        # 全部匹配模式
+        for keyword in keyword_list:
+            if keyword.lower() not in content_lower:
+                return False
+        return True
+    
+    else:  # ANY 模式（默认）
+        # 任一匹配模式
+        for keyword in keyword_list:
+            if keyword.lower() in content_lower:
+                return True
+        return False
+
+
 def get_webhook_from_db():
     """从数据库获取 webhook"""
     db = SessionLocal()
@@ -27,6 +80,7 @@ def get_webhook_from_db():
         return Config.get_webhook(db)
     finally:
         db.close()
+
 
 async def check_and_send(target_id, force=False):
     """
@@ -99,6 +153,26 @@ async def check_and_send(target_id, force=False):
                 new_pids = [r.get('pid', 'N/A') for r in new_replies]
                 logger.debug(f"[调试] 新回复 PID 列表: {new_pids}", extra={'target_uid': target.uid})
         
+        # ===== 关键词过滤 =====
+        if target.keywords and target.keywords.strip():
+            filtered_replies = []
+            for reply in new_replies:
+                content = reply.get('content_full', '')
+                topic_title = reply.get('topic_title', '')
+                check_content = f"{topic_title} {content}"  # 标题+内容一起检查
+                
+                if check_keywords(check_content, target.keywords, target.keyword_mode or 'ANY'):
+                    filtered_replies.append(reply)
+                    logger.info(f"用户 {target.uid}: 关键词匹配 PID {reply.get('pid')}", extra={'target_uid': target.uid})
+                else:
+                    logger.debug(f"用户 {target.uid}: 关键词过滤跳过 PID {reply.get('pid')}", extra={'target_uid': target.uid})
+            
+            # 记录过滤结果
+            if len(filtered_replies) < len(new_replies):
+                logger.info(f"用户 {target.uid}: 关键词过滤 {len(new_replies)} -> {len(filtered_replies)} 条", extra={'target_uid': target.uid})
+            
+            new_replies = filtered_replies
+        
         # 批量保存抓取到的回复到存档
         try:
             archived_count = await _bulk_archive_replies(db, target.id, replies)
@@ -108,10 +182,10 @@ async def check_and_send(target_id, force=False):
             # 存档失败不影响主流程
         
         if not new_replies:
-            logger.info(f"用户 {target.uid}: 没有新回复", extra={'target_uid': target.uid})
-            return {"success": True, "message": "没有新回复（都已发送过）", "replies_count": len(replies)}
+            logger.info(f"用户 {target.uid}: 没有符合关键词的新回复", extra={'target_uid': target.uid})
+            return {"success": True, "message": "没有符合关键词条件的新回复", "replies_count": len(replies), "filtered": True}
         
-        logger.info(f"用户 {target.uid}: 发现 {len(new_replies)} 条新回复", extra={'target_uid': target.uid})
+        logger.info(f"用户 {target.uid}: 发现 {len(new_replies)} 条符合关键词的新回复", extra={'target_uid': target.uid})
         
         webhook = get_webhook_from_db()
         if not webhook:

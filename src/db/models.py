@@ -19,6 +19,8 @@ class MonitorTarget(Base):
     url = Column(String(500), nullable=False)
     enabled = Column(Boolean, default=True)
     check_interval = Column(Integer, default=60)  # 秒
+    keywords = Column(Text, default='')  # 关键词过滤，逗号分隔
+    keyword_mode = Column(String(10), default='ANY')  # ANY(任一), ALL(全部), REGEX(正则)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
@@ -33,6 +35,8 @@ class MonitorTarget(Base):
             'url': self.url,
             'enabled': self.enabled,
             'check_interval': self.check_interval,
+            'keywords': self.keywords or '',
+            'keyword_mode': self.keyword_mode or 'ANY',
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

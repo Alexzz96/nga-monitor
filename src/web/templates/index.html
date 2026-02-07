@@ -414,6 +414,19 @@
                                 <input type="number" id="new-interval" value="60" min="10" 
                                        class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mt-1">
                             </div>
+                            <div>
+                                <label class="text-sm font-medium flex items-center gap-1">
+                                    <i class="fas fa-filter text-muted-foreground"></i>
+                                    关键词过滤
+                                </label>
+                                <input type="text" id="new-keywords" placeholder="股票,基金,比特币（逗号分隔，留空不过滤）" 
+                                       class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mt-1">
+                                <select id="new-keyword-mode" class="w-full mt-2 px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                    <option value="ANY">匹配任一关键词</option>
+                                    <option value="ALL">匹配全部关键词</option>
+                                    <option value="REGEX">正则表达式</option>
+                                </select>
+                            </div>
                             <button onclick="addTarget()" 
                                     class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-md">
                                 <i class="fas fa-plus mr-2"></i>添加监控
@@ -525,7 +538,16 @@
                 const res = await fetch('/api/targets');
                 const data = await res.json();
                 const tbody = document.getElementById('targets-table');
-                tbody.innerHTML = data.targets.map(t => `
+                tbody.innerHTML = data.targets.map(t => {
+                    const hasKeywords = t.keywords && t.keywords.trim();
+                    const keywordsBadge = hasKeywords 
+                        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 ml-2" title="${t.keywords}">
+                             <i class="fas fa-filter text-[10px]"></i>
+                             ${t.keyword_mode === 'REGEX' ? '正则' : t.keyword_mode === 'ALL' ? '全部' : '任一'}
+                           </span>`
+                        : '';
+                    
+                    return `
                     <tr class="border-b hover:bg-muted/50 transition-colors">
                         <td class="py-4 px-4">
                             <div class="flex items-center gap-3">
@@ -533,8 +555,12 @@
                                     ${(t.name || t.uid).charAt(0).toUpperCase()}
                                 </div>
                                 <div>
-                                    <p class="font-medium">${t.name || '-'}</p>
+                                    <div class="flex items-center">
+                                        <p class="font-medium">${t.name || '-'}</p>
+                                        ${keywordsBadge}
+                                    </div>
                                     <p class="text-xs text-muted-foreground">UID: ${t.uid}</p>
+                                    ${hasKeywords ? `<p class="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]" title="${t.keywords}">${t.keywords}</p>` : ''}
                                 </div>
                             </div>
                         </td>
@@ -563,7 +589,7 @@
                             </div>
                         </td>
                     </tr>
-                `).join('') || '<tr><td colspan="5" class="py-8 text-center text-muted-foreground">暂无监控目标</td></tr>';
+                `}).join('') || '<tr><td colspan="5" class="py-8 text-center text-muted-foreground">暂无监控目标</td></tr>';
             } catch (e) {
                 console.error('加载目标失败:', e);
             }
@@ -752,6 +778,8 @@
             const uid = document.getElementById('new-uid').value.trim();
             const name = document.getElementById('new-name').value.trim();
             const interval = parseInt(document.getElementById('new-interval').value) || 60;
+            const keywords = document.getElementById('new-keywords').value.trim();
+            const keywordMode = document.getElementById('new-keyword-mode').value;
             
             if (!uid) {
                 showAlert('请输入 UID', 'error');
@@ -762,13 +790,20 @@
                 const res = await fetch('/api/targets', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({uid, name, check_interval: interval})
+                    body: JSON.stringify({
+                        uid, 
+                        name, 
+                        check_interval: interval,
+                        keywords,
+                        keyword_mode: keywordMode
+                    })
                 });
                 
                 if (res.ok) {
                     showAlert('添加成功');
                     document.getElementById('new-uid').value = '';
                     document.getElementById('new-name').value = '';
+                    document.getElementById('new-keywords').value = '';
                     loadTargets();
                     loadStats();
                 } else {
