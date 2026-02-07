@@ -29,6 +29,11 @@ app.include_router(api_router)
 from web.routes.utils import parse_url
 app.post("/api/parse-url")(parse_url)
 
+# 向后兼容：日志端点别名
+from web.routes.stats import get_logs, cleanup_logs
+app.get("/api/logs")(get_logs)
+app.post("/api/logs/cleanup")(cleanup_logs)
+
 STORAGE_STATE_PATH = Path(os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.json'))
 
 
