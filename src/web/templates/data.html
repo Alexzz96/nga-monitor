@@ -448,8 +448,30 @@
                     </div>
                 `;
                 
-                // 加载历史列表
-                const historyRes = await fetch(`/api/archive/history/${targetId}`);
+                // 加载历史列表（支持分页）
+                await loadHistoryPage(targetId, 1);
+            } catch (e) {
+                console.error('加载历史失败:', e);
+                document.getElementById('target-stats').innerHTML = `
+                    <div class="p-4 rounded-xl bg-red-50 text-red-600 text-center">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>加载失败: ${e.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 当前页码缓存
+        let currentHistoryPage = 1;
+        let currentHistoryTargetId = null;
+
+        // 加载历史分页数据
+        async function loadHistoryPage(targetId, page) {
+            currentHistoryTargetId = targetId;
+            currentHistoryPage = page;
+            
+            try {
+                const historyRes = await fetch(`/api/archive/history/${targetId}?page=${page}&limit=20`);
                 if (!historyRes.ok) {
                     throw new Error(`API错误: ${historyRes.status}`);
                 }
@@ -462,33 +484,58 @@
                             <p>暂无历史数据</p>
                         </div>
                     `;
-                } else {
-                    document.getElementById('history-list').innerHTML = `
-                        <div class="space-y-3">
-                            ${history.records.map(r => `
-                                <div class="p-4 rounded-xl border hover:bg-muted/50 transition-all">
-                                    <div class="flex items-start justify-between">
-                                        <div class="flex-1 min-w-0">
-                                            <p class="font-medium truncate">${r.topic_title || '无标题'}</p>
-                                            <p class="text-sm text-muted-foreground mt-1">${r.post_date || '-'} · ${r.forum || '未知版块'}</p>
-                                        </div>
-                                        <a href="${r.url}" target="_blank" class="p-2 rounded-lg hover:bg-primary/10 text-primary transition-all ml-2 flex-shrink-0">
-                                            <i class="fas fa-external-link-alt"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="flex justify-center mt-4">
-                            <button onclick="loadTargetHistory()" class="px-4 py-2 border rounded-lg hover:bg-muted transition-all text-sm">刷新</button>
-                        </div>
-                    `;
+                    return;
                 }
+                
+                const totalPages = Math.ceil(history.total / history.limit);
+                
+                document.getElementById('history-list').innerHTML = `
+                    <div class="space-y-3">
+                        ${history.records.map(r => `
+                            <div class="p-4 rounded-xl border hover:bg-muted/50 transition-all">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="flex-1 min-w-0">
+                                        <p class="text-sm font-medium text-foreground line-clamp-3">${r.main_content || r.content_full || '无内容'}</p>
+                                        <div class="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                                            <span class="bg-muted px-2 py-0.5 rounded">${r.post_date || '-'}</span>
+                                            <span>${r.forum || '未知版块'}</span>
+                                            <span class="truncate max-w-[200px]" title="${r.topic_title || ''}">主题: ${r.topic_title || '无标题'}</span>
+                                        </div>
+                                    </div>
+                                    <a href="${r.url}" target="_blank" class="p-2 rounded-lg hover:bg-primary/10 text-primary transition-all flex-shrink-0" title="查看原帖">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <!-- 分页控制 -->
+                    <div class="flex items-center justify-between mt-6 pt-4 border-t">
+                        <div class="text-sm text-muted-foreground">
+                            共 ${history.total} 条 · 第 ${history.page}/${totalPages} 页
+                        </div>
+                        <div class="flex gap-2">
+                            <button 
+                                onclick="loadHistoryPage(${targetId}, ${page - 1})" 
+                                class="px-3 py-1.5 rounded-lg border hover:bg-muted transition-all text-sm ${page <= 1 ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${page <= 1 ? 'disabled' : ''}>
+                                <i class="fas fa-chevron-left mr-1"></i>上一页
+                            </button>
+                            <button 
+                                onclick="loadHistoryPage(${targetId}, ${page + 1})" 
+                                class="px-3 py-1.5 rounded-lg border hover:bg-muted transition-all text-sm ${page >= totalPages ? 'opacity-50 cursor-not-allowed' : ''}"
+                                ${page >= totalPages ? 'disabled' : ''}>
+                                下一页<i class="fas fa-chevron-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
             } catch (e) {
-                console.error('加载历史失败:', e);
-                document.getElementById('target-stats').innerHTML = `
-                    <div class="p-4 rounded-xl bg-red-50 text-red-600 text-center">
-                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                console.error('加载历史分页失败:', e);
+                document.getElementById('history-list').innerHTML = `
+                    <div class="text-center py-12 text-muted-foreground">
+                        <i class="fas fa-exclamation-circle text-4xl mb-4 opacity-50"></i>
                         <p>加载失败: ${e.message}</p>
                     </div>
                 `;
