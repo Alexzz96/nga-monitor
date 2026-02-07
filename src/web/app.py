@@ -60,7 +60,6 @@ async def data_page(request: Request):
 async def health_check():
     """健康检查端点"""
     from browser_pool import BrowserPool
-    from monitor import SCHEDULER
     from rate_limiter import get_limiter_stats
     
     pool = BrowserPool.get_instance()
@@ -71,7 +70,6 @@ async def health_check():
         "status": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "storage_state": STORAGE_STATE_PATH.exists(),
-        "scheduler_running": SCHEDULER.running if SCHEDULER else False,
         "browser_pool": pool_stats,
         "rate_limiters": limiter_stats
     }
