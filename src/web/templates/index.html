@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NGA Monitor - 监控管理</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
@@ -141,20 +142,253 @@
         </div>
     </nav>
 
-    <!-- 左侧悬浮导航 -->
+    <!-- 左侧悬浮导航 - 仅情绪趋势 -->
     <div class="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 bg-card/90 backdrop-blur rounded-xl shadow-lg border p-2">
-        <a href="/" class="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center transition-all shadow-md" title="监控">
-            <i class="fas fa-satellite-dish"></i>
-        </a>
-        <a href="/ai" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="AI分析">
-            <i class="fas fa-robot"></i>
-        </a>
-        <a href="/data" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="数据">
-            <i class="fas fa-database"></i>
-        </a>
-        <a href="/analytics" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="情绪分析">
+        <button onclick="openSentimentModal()" class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:scale-105" title="情绪趋势">
             <i class="fas fa-chart-line"></i>
-        </a>
+        </button>
+    </div>
+
+    <!-- 情绪趋势悬浮面板 -->
+    <div id="sentiment-modal" class="fixed inset-0 z-50 hidden">
+        <!-- 背景遮罩 -->
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="closeSentimentModal()"></div>
+        
+        <!-- 面板内容 -->
+        <div class="absolute right-0 top-0 h-full w-full max-w-5xl bg-background shadow-2xl transform transition-transform translate-x-full" id="sentiment-panel">
+            <!-- 面板头部 -->
+            <div class="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-card/95 backdrop-blur">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                        <i class="fas fa-chart-line text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold">情绪趋势分析</h2>
+                        <p class="text-xs text-muted-foreground">基于 AI 分析的用户情绪变化</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="last-update" class="text-xs text-muted-foreground"></span>
+                    <button onclick="refreshSentimentData()" class="p-2 rounded-lg hover:bg-muted transition-all" title="刷新">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button onclick="closeSentimentModal()" class="p-2 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all" title="关闭">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 面板主体 -->
+            <div class="p-6 overflow-y-auto h-[calc(100vh-80px)]">
+                <!-- 时间范围选择 -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted-foreground">时间范围：</span>
+                        <div class="flex items-center gap-1 bg-muted rounded-lg p-1">
+                            <button onclick="setSentimentRange(7)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="7">7天</button>
+                            <button onclick="setSentimentRange(30)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md bg-background shadow-sm transition-all" data-days="30">30天</button>
+                            <button onclick="setSentimentRange(60)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="60">60天</button>
+                            <button onclick="setSentimentRange(90)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="90">90天</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted-foreground">用户筛选：</span>
+                        <select id="sentiment-target-filter" onchange="filterSentimentByTarget()" class="px-3 py-1.5 text-sm rounded-lg border bg-background">
+                            <option value="">所有用户</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 汇总卡片 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-blue-100 text-xs">总回复数</p>
+                                <p class="text-2xl font-bold mt-1" id="summary-total">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-comments text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-green-100 text-xs">已分析</p>
+                                <p class="text-2xl font-bold mt-1" id="summary-analyzed">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-brain text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-purple-100 text-xs">平均情绪</p>
+                                <p class="text-2xl font-bold mt-1" id="summary-sentiment">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-smile text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-orange-100 text-xs">最活跃日</p>
+                                <p class="text-sm font-bold mt-1" id="summary-active">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-calendar-day text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签页导航 -->
+                <div class="flex items-center gap-1 bg-muted rounded-lg p-1 mb-6 w-fit">
+                    <button onclick="switchSentimentTab('trend')" id="tab-trend" class="sentiment-tab px-4 py-2 text-sm rounded-md bg-background shadow-sm transition-all">
+                        <i class="fas fa-chart-line mr-1"></i>情绪趋势
+                    </button>
+                    <button onclick="switchSentimentTab('cycle')" id="tab-cycle" class="sentiment-tab px-4 py-2 text-sm rounded-md transition-all text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-wave-square mr-1"></i>周期指数
+                    </button>
+                </div>
+
+                <!-- 情绪趋势图 -->
+                <div id="panel-trend" class="sentiment-panel-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div class="lg:col-span-2 bg-card rounded-2xl p-6 shadow-sm border">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold">
+                                    <i class="fas fa-chart-line text-primary mr-2"></i>情绪趋势
+                                </h3>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span>乐观</span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span>中性</span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>悲观</span>
+                                </div>
+                            </div>
+                            <div id="sentiment-chart" style="height: 350px;"></div>
+                        </div>
+                        
+                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
+                            <h3 class="font-semibold mb-4">
+                                <i class="fas fa-pie-chart text-primary mr-2"></i>情绪分布
+                            </h3>
+                            <div id="distribution-chart" style="height: 350px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 活跃度热力图和关键词 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
+                            <h3 class="font-semibold mb-4">
+                                <i class="fas fa-fire text-primary mr-2"></i>活跃度热力图
+                            </h3>
+                            <div id="heatmap-chart" style="height: 300px;"></div>
+                        </div>
+                        
+                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
+                            <h3 class="font-semibold mb-4">
+                                <i class="fas fa-tags text-primary mr-2"></i>关键词情绪排行
+                            </h3>
+                            <div id="keywords-chart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 周期指数面板 -->
+                <div id="panel-cycle" class="sentiment-panel-content hidden">
+                    <div class="bg-card rounded-2xl p-6 shadow-sm border mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold">
+                                <i class="fas fa-wave-square text-primary mr-2"></i>情绪周期指数 (0-100)
+                            </h3>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500"></span>悲观区(&lt;30)</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-400"></span>中性区(30-70)</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500"></span>乐观区(&gt;70)</span>
+                                <span class="flex items-center gap-1"><span class="w-4 h-0.5 bg-orange-500"></span>MA7均线</span>
+                            </div>
+                        </div>
+                        <div id="cycle-chart" style="height: 400px;"></div>
+                    </div>
+
+                    <!-- 周期统计卡片 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-blue-100 text-xs">当前指数</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-current">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-tachometer-alt text-lg"></i>
+                                </div>
+                            </div>
+                            <p class="text-blue-100 text-xs mt-2" id="cycle-phase">阶段: -</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-green-100 text-xs">7日均值</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-ma7">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-chart-line text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-purple-100 text-xs">最高指数</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-max">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-arrow-up text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-orange-100 text-xs">最低指数</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-min">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-arrow-down text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 周期说明 -->
+                    <div class="bg-muted/50 rounded-xl p-4 text-sm text-muted-foreground">
+                        <p><i class="fas fa-info-circle mr-1"></i> 情绪周期指数说明：</p>
+                        <ul class="mt-2 space-y-1 ml-5 list-disc">
+                            <li>指数范围：0-100，50为中性分界线</li>
+                            <li>70以上：乐观区域，可能处于周期顶部</li>
+                            <li>30以下：悲观区域，可能处于周期底部</li>
+                            <li>MA7均线：7日移动平均线，用于判断趋势方向</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 说明 -->
+                <div class="bg-muted/50 rounded-xl p-4 text-sm text-muted-foreground">
+                    <p><i class="fas fa-info-circle mr-1"></i> 情绪分析说明：</p>
+                    <ul class="mt-2 space-y-1 ml-5 list-disc">
+                        <li>情绪指数范围：-1.0（极度悲观）到 +1.0（极度乐观）</li>
+                        <li>数据每日凌晨自动更新，分析最近回复的情绪倾向</li>
+                        <li>关键词提取基于常见投资词汇，情绪为该词出现时回复的平均情绪</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 
     <main class="container mx-auto px-4 py-8 max-w-7xl">
@@ -1046,6 +1280,472 @@
             loadStats();
             loadLogs();
         }, 30000);
+
+        // ========== 情绪趋势悬浮面板 ==========
+        let sentimentChart, distributionChart, heatmapChart, keywordsChart;
+        let sentimentDays = 30;
+        let sentimentTarget = '';
+
+        function openSentimentModal() {
+            const modal = document.getElementById('sentiment-modal');
+            const panel = document.getElementById('sentiment-panel');
+            modal.classList.remove('hidden');
+            // 触发重排以启动动画
+            void panel.offsetWidth;
+            panel.classList.remove('translate-x-full');
+            
+            // 初始化图表
+            if (!sentimentChart) {
+                initSentimentCharts();
+                loadSentimentTargets();
+            }
+            refreshSentimentData();
+        }
+
+        function closeSentimentModal() {
+            const modal = document.getElementById('sentiment-modal');
+            const panel = document.getElementById('sentiment-panel');
+            panel.classList.add('translate-x-full');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function initSentimentCharts() {
+            sentimentChart = echarts.init(document.getElementById('sentiment-chart'));
+            distributionChart = echarts.init(document.getElementById('distribution-chart'));
+            heatmapChart = echarts.init(document.getElementById('heatmap-chart'));
+            keywordsChart = echarts.init(document.getElementById('keywords-chart'));
+            cycleChart = echarts.init(document.getElementById('cycle-chart'));
+
+            window.addEventListener('resize', () => {
+                sentimentChart?.resize();
+                distributionChart?.resize();
+                heatmapChart?.resize();
+                keywordsChart?.resize();
+                cycleChart?.resize();
+            });
+        }
+
+        async function loadSentimentTargets() {
+            try {
+                const res = await fetch('/api/targets');
+                const data = await res.json();
+                const select = document.getElementById('sentiment-target-filter');
+                
+                data.targets.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t.id;
+                    option.textContent = t.name || `用户${t.uid}`;
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                console.error('加载用户失败:', e);
+            }
+        }
+
+        function setSentimentRange(days) {
+            sentimentDays = days;
+            document.querySelectorAll('.sentiment-range-btn').forEach(btn => {
+                if (parseInt(btn.dataset.days) === days) {
+                    btn.classList.add('bg-background', 'shadow-sm');
+                } else {
+                    btn.classList.remove('bg-background', 'shadow-sm');
+                }
+            });
+            refreshSentimentData();
+        }
+
+        function filterSentimentByTarget() {
+            sentimentTarget = document.getElementById('sentiment-target-filter').value;
+            refreshSentimentData();
+        }
+
+        async function refreshSentimentData() {
+            try {
+                // 加载汇总数据
+                const summaryRes = await fetch(`/api/analytics/summary?days=${sentimentDays}`);
+                const summary = await summaryRes.json();
+                updateSentimentSummary(summary);
+
+                // 加载情绪趋势
+                const trendRes = await fetch(`/api/analytics/sentiment/trend?days=${sentimentDays}${sentimentTarget ? '&target_id='+sentimentTarget : ''}`);
+                const trend = await trendRes.json();
+                updateSentimentTrendChart(trend);
+
+                // 加载情绪分布
+                const distRes = await fetch(`/api/analytics/sentiment/distribution?days=${sentimentDays}${sentimentTarget ? '&target_id='+sentimentTarget : ''}`);
+                const dist = await distRes.json();
+                updateDistributionChart(dist);
+
+                // 加载活跃度热力图
+                const heatmapRes = await fetch(`/api/analytics/activity/heatmap?days=${sentimentDays}${sentimentTarget ? '&target_id='+sentimentTarget : ''}`);
+                const heatmap = await heatmapRes.json();
+                updateHeatmapChart(heatmap);
+
+                // 加载关键词
+                const keywordsRes = await fetch(`/api/analytics/keywords/sentiment?days=${sentimentDays}${sentimentTarget ? '&target_id='+sentimentTarget : ''}`);
+                const keywords = await keywordsRes.json();
+                updateKeywordsChart(keywords);
+
+                document.getElementById('last-update').textContent = 
+                    '更新于: ' + new Date().toLocaleTimeString('zh-CN');
+            } catch (e) {
+                console.error('刷新情绪数据失败:', e);
+            }
+        }
+
+        function updateSentimentSummary(data) {
+            document.getElementById('summary-total').textContent = data.total_replies || 0;
+            document.getElementById('summary-analyzed').textContent = data.analyzed_replies || 0;
+            
+            const sentiment = data.avg_sentiment || 0;
+            const sentimentEl = document.getElementById('summary-sentiment');
+            sentimentEl.textContent = sentiment > 0 ? `+${sentiment.toFixed(2)}` : sentiment.toFixed(2);
+            sentimentEl.className = 'text-2xl font-bold mt-1 ' + 
+                (sentiment > 0.2 ? 'text-green-200' : sentiment < -0.2 ? 'text-red-200' : '');
+            
+            document.getElementById('summary-active').textContent = data.most_active_day || '-';
+        }
+
+        function updateSentimentTrendChart(data) {
+            const series = data.series.map((s) => ({
+                name: s.name,
+                type: 'line',
+                smooth: true,
+                symbol: 'circle',
+                symbolSize: 6,
+                lineStyle: { width: 3 },
+                data: s.data,
+                markLine: {
+                    data: [{ yAxis: 0, lineStyle: { color: '#999', type: 'dashed' } }]
+                }
+            }));
+
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        let html = params[0].axisValue + '<br/>';
+                        params.forEach(p => {
+                            const val = p.value !== null ? (p.value > 0 ? '+' + p.value : p.value) : '-';
+                            html += `${p.marker} ${p.seriesName}: ${val}<br/>`;
+                        });
+                        return html;
+                    }
+                },
+                legend: { bottom: 0 },
+                grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: data.dates,
+                    axisLabel: { rotate: 45 }
+                },
+                yAxis: {
+                    type: 'value',
+                    min: -1,
+                    max: 1,
+                    splitLine: { lineStyle: { type: 'dashed' } }
+                },
+                series: series
+            };
+
+            sentimentChart.setOption(option, true);
+        }
+
+        function updateDistributionChart(data) {
+            const option = {
+                tooltip: { trigger: 'item' },
+                legend: { bottom: 0 },
+                series: [{
+                    type: 'pie',
+                    radius: ['40%', '70%'],
+                    center: ['50%', '45%'],
+                    avoidLabelOverlap: false,
+                    itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
+                    label: { show: false },
+                    emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+                    data: [
+                        { value: data.positive, name: '乐观', itemStyle: { color: '#22c55e' } },
+                        { value: data.neutral, name: '中性', itemStyle: { color: '#9ca3af' } },
+                        { value: data.negative, name: '悲观', itemStyle: { color: '#ef4444' } }
+                    ]
+                }]
+            };
+
+            distributionChart.setOption(option, true);
+        }
+
+        function updateHeatmapChart(data) {
+            const heatmapData = [];
+            data.data.forEach((hourData, hour) => {
+                hourData.forEach((count, dayIndex) => {
+                    if (count > 0) {
+                        heatmapData.push([dayIndex, hour, count]);
+                    }
+                });
+            });
+
+            const option = {
+                tooltip: {
+                    position: 'top',
+                    formatter: function(p) {
+                        return `${data.dates[p.data[0]]} ${p.data[1]}时<br/>回复数: ${p.data[2]}`;
+                    }
+                },
+                grid: { left: '3%', right: '4%', bottom: '15%', top: '5%', containLabel: true },
+                xAxis: {
+                    type: 'category',
+                    data: data.dates.map(d => d.slice(5)),
+                    splitArea: { show: true },
+                    axisLabel: { rotate: 45, interval: 'auto' }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: data.hours.map(h => h + '时'),
+                    splitArea: { show: true }
+                },
+                visualMap: {
+                    min: 0,
+                    max: Math.max(...data.data.flat()),
+                    calculable: true,
+                    orient: 'horizontal',
+                    left: 'center',
+                    bottom: 0,
+                    inRange: { color: ['#f0f9ff', '#0ea5e9', '#0369a1'] }
+                },
+                series: [{
+                    type: 'heatmap',
+                    data: heatmapData,
+                    label: { show: false },
+                    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+                }]
+            };
+
+            heatmapChart.setOption(option, true);
+        }
+
+        function updateKeywordsChart(data) {
+            const words = data.keywords.slice(0, 10);
+            
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    axisPointer: { type: 'shadow' },
+                    formatter: function(p) {
+                        const d = p[0];
+                        return `${d.name}<br/>出现次数: ${d.data.count}<br/>平均情绪: ${d.data.sentiment > 0 ? '+' : ''}${d.data.sentiment}`;
+                    }
+                },
+                grid: { left: '3%', right: '10%', bottom: '3%', top: '3%', containLabel: true },
+                xAxis: {
+                    type: 'value',
+                    min: -1,
+                    max: 1,
+                    splitLine: { lineStyle: { type: 'dashed' } }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: words.map(w => w.word).reverse(),
+                    axisLabel: { fontSize: 12 }
+                },
+                series: [{
+                    type: 'bar',
+                    data: words.map(w => ({
+                        value: w.avg_sentiment,
+                        count: w.count,
+                        sentiment: w.avg_sentiment,
+                        itemStyle: {
+                            color: w.avg_sentiment > 0.2 ? '#22c55e' : 
+                                   w.avg_sentiment < -0.2 ? '#ef4444' : '#9ca3af'
+                        }
+                    })).reverse(),
+                    barWidth: '60%',
+                    label: {
+                        show: true,
+                        position: 'right',
+                        formatter: function(p) {
+                            return (p.value > 0 ? '+' : '') + p.value;
+                        }
+                    }
+                }]
+            };
+
+            keywordsChart.setOption(option, true);
+        }
+
+        // ========== 周期指数相关函数 ==========
+        let currentSentimentTab = 'trend';
+        let cycleChart;
+
+        // 切换情绪趋势标签页
+        function switchSentimentTab(tab) {
+            currentSentimentTab = tab;
+            
+            // 更新按钮样式
+            document.querySelectorAll('.sentiment-tab').forEach(btn => {
+                btn.classList.remove('bg-background', 'shadow-sm');
+                btn.classList.add('text-muted-foreground');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('bg-background', 'shadow-sm');
+            document.getElementById(`tab-${tab}`).classList.remove('text-muted-foreground');
+            
+            // 切换面板显示
+            document.querySelectorAll('.sentiment-panel-content').forEach(panel => {
+                panel.classList.add('hidden');
+            });
+            document.getElementById(`panel-${tab}`).classList.remove('hidden');
+            
+            // 如果切换到周期指数，刷新数据
+            if (tab === 'cycle') {
+                refreshCycleData();
+            }
+        }
+
+        // 刷新周期指数数据
+        async function refreshCycleData() {
+            try {
+                const res = await fetch(`/api/analytics/cycle/index?days=${sentimentDays}${sentimentTarget ? '&target_id='+sentimentTarget : ''}`);
+                const data = await res.json();
+                updateCycleChart(data);
+                updateCycleStats(data);
+            } catch (e) {
+                console.error('刷新周期指数失败:', e);
+            }
+        }
+
+        // 更新周期指数图表
+        function updateCycleChart(data) {
+            // 过滤掉无数据点用于连线
+            const validIndices = data.index.map((val, idx) => val !== null ? [data.dates[idx], val] : null).filter(x => x);
+            const validMA7 = data.ma7.map((val, idx) => val !== null ? [data.dates[idx], val] : null).filter(x => x);
+            
+            const option = {
+                tooltip: {
+                    trigger: 'axis',
+                    formatter: function(params) {
+                        const date = params[0].axisValue;
+                        const idx = data.dates.indexOf(date);
+                        const phase = data.phases[idx] || '-';
+                        let html = `${date} (${phase})<br/>`;
+                        params.forEach(p => {
+                            html += `${p.marker} ${p.seriesName}: ${p.value[1] || p.value}<br/>`;
+                        });
+                        return html;
+                    }
+                },
+                grid: { left: '3%', right: '4%', bottom: '15%', top: '10%', containLabel: true },
+                xAxis: {
+                    type: 'category',
+                    boundaryGap: false,
+                    data: data.dates,
+                    axisLabel: { rotate: 45 }
+                },
+                yAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: 100,
+                    splitLine: { lineStyle: { type: 'dashed' } },
+                    axisLabel: { formatter: '{value}' }
+                },
+                series: [
+                    {
+                        type: 'line',
+                        markArea: {
+                            silent: true,
+                            data: [[{
+                                yAxis: 0,
+                                itemStyle: { color: 'rgba(239, 68, 68, 0.1)' }
+                            }, {
+                                yAxis: 30
+                            }]]
+                        }
+                    },
+                    {
+                        type: 'line',
+                        markArea: {
+                            silent: true,
+                            data: [[{
+                                yAxis: 70,
+                                itemStyle: { color: 'rgba(34, 197, 94, 0.1)' }
+                            }, {
+                                yAxis: 100
+                            }]]
+                        }
+                    },
+                    {
+                        type: 'line',
+                        markLine: {
+                            silent: true,
+                            data: [
+                                { yAxis: 30, lineStyle: { color: '#ef4444', type: 'dashed' }, label: { formatter: '悲观线' } },
+                                { yAxis: 50, lineStyle: { color: '#9ca3af', type: 'dashed' }, label: { formatter: '中性线' } },
+                                { yAxis: 70, lineStyle: { color: '#22c55e', type: 'dashed' }, label: { formatter: '乐观线' } }
+                            ]
+                        }
+                    },
+                    {
+                        name: '情绪指数',
+                        type: 'line',
+                        data: data.index.map((val, idx) => [data.dates[idx], val]),
+                        smooth: true,
+                        symbol: 'circle',
+                        symbolSize: 6,
+                        lineStyle: { width: 3, color: '#6366f1' },
+                        itemStyle: { color: '#6366f1' },
+                        areaStyle: {
+                            color: {
+                                type: 'linear',
+                                x: 0, y: 0, x2: 0, y2: 1,
+                                colorStops: [
+                                    { offset: 0, color: 'rgba(99, 102, 241, 0.3)' },
+                                    { offset: 1, color: 'rgba(99, 102, 241, 0.05)' }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        name: 'MA7',
+                        type: 'line',
+                        data: data.ma7.map((val, idx) => [data.dates[idx], val]),
+                        smooth: true,
+                        symbol: 'none',
+                        lineStyle: { width: 2, color: '#f97316', type: 'dashed' }
+                    }
+                ]
+            };
+
+            cycleChart.setOption(option, true);
+        }
+
+        // 更新周期统计
+        function updateCycleStats(data) {
+            const validIndices = data.index.filter(x => x !== null);
+            const validMA7 = data.ma7.filter(x => x !== null);
+            
+            if (validIndices.length > 0) {
+                const current = validIndices[validIndices.length - 1];
+                const ma7 = validMA7[validMA7.length - 1];
+                const max = Math.max(...validIndices);
+                const min = Math.min(...validIndices);
+                
+                const lastIdx = data.index.length - 1;
+                const phase = data.phases[lastIdx] || '-';
+                
+                document.getElementById('cycle-current').textContent = current.toFixed(1);
+                document.getElementById('cycle-phase').textContent = `阶段: ${phase}`;
+                document.getElementById('cycle-ma7').textContent = ma7 ? ma7.toFixed(1) : '-';
+                document.getElementById('cycle-max').textContent = max.toFixed(1);
+                document.getElementById('cycle-min').textContent = min.toFixed(1);
+            } else {
+                document.getElementById('cycle-current').textContent = '-';
+                document.getElementById('cycle-phase').textContent = '阶段: -';
+                document.getElementById('cycle-ma7').textContent = '-';
+                document.getElementById('cycle-max').textContent = '-';
+                document.getElementById('cycle-min').textContent = '-';
+            }
+        }
     </script>
 </body>
 </html>

@@ -415,3 +415,233 @@ async def get_analytics_summary(
         "most_positive_day": most_positive_day,
         "most_negative_day": most_negative_day
     }
+
+
+@router.get("/cycle/index")
+async def get_sentiment_cycle_index(
+    target_id: int = None,
+    days: int = Query(default=30, ge=7, le=90),
+    db: Session = Depends(get_db)
+):
+    """
+    获取情绪周期指数（0-100分制）
+    
+    Args:
+        target_id: 用户ID，不传则返回汇总数据
+        days: 天数范围 (7-90)
+    
+    Returns:
+        {
+            "dates": ["2026-02-01", ...],
+            "index": [65, 72, 58, ...],  // 0-100 情绪指数
+            "ma7": [63, 66, 64, ...],   // 7日均线
+            "phases": ["上升", "顶部", "下降", ...]  // 周期阶段
+        }
+    """
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days)
+    
+    # 生成日期列表
+    date_list = []
+    current = start_date
+    while current <= end_date:
+        date_list.append(current.strftime('%Y-%m-%d'))
+        current += timedelta(days=1)
+    
+    # 构建查询
+    query = db.query(ReplyArchive).filter(
+        ReplyArchive.sentiment.isnot(None),
+        ReplyArchive.created_at >= start_date,
+        ReplyArchive.created_at <= end_date
+    )
+    
+    if target_id:
+        query = query.filter(ReplyArchive.target_id == target_id)
+    
+    replies = query.all()
+    
+    # 按日期分组计算情绪指数
+    from collections import defaultdict
+    daily_sentiments = defaultdict(list)
+    
+    for r in replies:
+        if r.created_at and r.sentiment_score is not None:
+            date_str = r.created_at.strftime('%Y-%m-%d')
+            # 转换为 0-100 指数: (score + 1) * 50
+            index = (r.sentiment_score + 1) * 50
+            daily_sentiments[date_str].append(index)
+    
+    # 计算每日平均指数
+    index_data = []
+    for date in date_list:
+        if date in daily_sentiments and daily_sentiments[date]:
+            avg_index = sum(daily_sentiments[date]) / len(daily_sentiments[date])
+            index_data.append(round(avg_index, 1))
+        else:
+            index_data.append(None)  # 无数据
+    
+    # 计算7日均线
+    ma7_data = []
+    for i in range(len(index_data)):
+        # 取最近7天有数据的平均值
+        window = [x for x in index_data[max(0, i-6):i+1] if x is not None]
+        if window:
+            ma7_data.append(round(sum(window) / len(window), 1))
+        else:
+            ma7_data.append(None)
+    
+    # 识别周期阶段
+    phases = _identify_cycle_phases(index_data, ma7_data)
+    
+    return {
+        "dates": date_list,
+        "index": index_data,
+        "ma7": ma7_data,
+        "phases": phases,
+        "reference_lines": {
+            "optimistic": 70,
+            "neutral": 50,
+            "pessimistic": 30
+        }
+    }
+
+
+def _identify_cycle_phases(index_data: list, ma7_data: list) -> list:
+    """识别情绪周期阶段"""
+    phases = []
+    
+    for i in range(len(index_data)):
+        idx = index_data[i]
+        ma = ma7_data[i] if i < len(ma7_data) else None
+        
+        if idx is None or ma is None:
+            phases.append("-")
+            continue
+        
+        # 简单规则判断
+        if idx >= 70:
+            phase = "顶部"
+        elif idx <= 30:
+            phase = "底部"
+        elif idx > ma:
+            phase = "上升"
+        elif idx < ma:
+            phase = "下降"
+        else:
+            phase = "震荡"
+        
+        phases.append(phase)
+    
+    return phases
+
+
+def _get_cycle_data_core(target_id: int, days: int, db: Session) -> dict:
+    """
+    获取情绪周期数据的核心逻辑（同步版本，供其他模块调用）
+    """
+    target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days)
+    
+    # 获取该用户的回复
+    replies = db.query(ReplyArchive).filter(
+        ReplyArchive.target_id == target_id,
+        ReplyArchive.sentiment.isnot(None),
+        ReplyArchive.created_at >= start_date,
+        ReplyArchive.created_at <= end_date
+    ).all()
+    
+    # 按日期分组
+    from collections import defaultdict
+    daily_data = defaultdict(lambda: {"indices": [], "contents": [], "keywords": set()})
+    
+    for r in replies:
+        if r.created_at and r.sentiment_score is not None:
+            date_str = r.created_at.strftime('%Y-%m-%d')
+            index = (r.sentiment_score + 1) * 50
+            daily_data[date_str]["indices"].append(index)
+            daily_data[date_str]["contents"].append(r.main_content or r.content_full or "")
+    
+    # 构建每日汇总
+    daily_summary = []
+    all_indices = []
+    
+    current = start_date
+    while current <= end_date:
+        date_str = current.strftime('%Y-%m-%d')
+        if date_str in daily_data:
+            indices = daily_data[date_str]["indices"]
+            avg_index = sum(indices) / len(indices)
+            all_indices.extend(indices)
+            
+            # 提取关键词（简化版）
+            keywords = _extract_keywords_from_contents(daily_data[date_str]["contents"])
+            
+            daily_summary.append({
+                "date": date_str,
+                "index": round(avg_index, 1),
+                "reply_count": len(indices),
+                "keywords": list(keywords)[:10]
+            })
+        current += timedelta(days=1)
+    
+    # 统计数据
+    if all_indices:
+        avg_index = sum(all_indices) / len(all_indices)
+        max_index = max(all_indices)
+        min_index = min(all_indices)
+        # 波动率：标准差 / 均值
+        variance = sum((x - avg_index) ** 2 for x in all_indices) / len(all_indices)
+        volatility = (variance ** 0.5) / avg_index if avg_index > 0 else 0
+    else:
+        avg_index = max_index = min_index = volatility = 0
+    
+    return {
+        "target_name": target.name or f"用户{target.uid}",
+        "date_range": {
+            "start": start_date.strftime('%Y-%m-%d'),
+            "end": end_date.strftime('%Y-%m-%d')
+        },
+        "daily_data": daily_summary,
+        "statistics": {
+            "avg_index": round(avg_index, 1),
+            "max_index": round(max_index, 1),
+            "min_index": round(min_index, 1),
+            "volatility": round(volatility, 3)
+        }
+    }
+
+
+@router.get("/cycle/data-for-ai")
+async def get_cycle_data_for_ai_analysis(
+    target_id: int,
+    days: int = Query(default=30, ge=7, le=90),
+    db: Session = Depends(get_db)
+):
+    """
+    获取用于 AI 情绪周期分析的数据（HTTP API 版本）
+    """
+    return _get_cycle_data_core(target_id, days, db)
+def _extract_keywords_from_contents(contents: list) -> set:
+    """从内容中提取关键词"""
+    keywords = set()
+    investment_keywords = [
+        "股票", "基金", "债券", "期货", "期权", "外汇", "黄金", "比特币",
+        "以太坊", "加密货币", "A股", "港股", "美股", "沪深", "创业板",
+        "牛市", "熊市", "涨停", "跌停", "大涨", "大跌", "反弹", "回调",
+        "抄底", "逃顶", "加仓", "减仓", "止盈", "止损", "套牢", "解套",
+        "市盈率", "市净率", "ROE", "分红", "股息", "财报", "年报",
+        "美联储", "加息", "降息", "CPI", "PPI", "GDP", "通胀", "通缩",
+        "人民币", "美元", "汇率", "原油"
+    ]
+    
+    for content in contents:
+        if content:
+            for kw in investment_keywords:
+                if kw in content:
+                    keywords.add(kw)
+    
+    return keywords

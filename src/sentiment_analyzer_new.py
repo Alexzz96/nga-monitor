@@ -5,6 +5,7 @@
 import os
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from typing import List, Dict, Tuple
 
@@ -19,12 +20,12 @@ SENTIMENT_PROMPT = """分析以下论坛回复的情绪倾向。只输出 JSON �
 {content}
 
 请分析该回复表达的情绪，输出格式：
-{
+{{
     "sentiment": "positive" | "neutral" | "negative",
     "score": 0.8,  // -1.0 到 1.0 之间的数值，越接近1越乐观，越接近-1越悲观
     "confidence": 0.9,  // 置信度 0-1
     "keywords": ["股票", "看涨"]  // 提取的关键投资相关词汇
-}
+}}
 
 判断标准：
 - positive: 表达乐观、看好、上涨、盈利、推荐买入等积极态度
@@ -116,43 +117,37 @@ class SentimentAnalyzer:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "你是一个专业的投资情绪分析助手，擅长分析论坛帖子中的情绪倾向。只输出 JSON 格式结果。"},
+                    {"role": "system", "content": "你是一个专业的投资情绪分析助手，擅长分析论坛帖子中的情绪倾向。只输出 JSON 格式结果，格式必须是：{\"sentiment\": \"positive/neutral/negative\", \"score\": 0.5, \"confidence\": 0.8, \"keywords\": []}"},
                     {"role": "user", "content": SENTIMENT_PROMPT.format(content=content[:2000])}
                 ],
-                temperature=0.3
+                temperature=0.3,
+                max_tokens=200
             )
             
-            content_text = response.choices[0].message.content
+            content_text = response.choices[0].message.content.strip()
             
             # 尝试提取 JSON
-            try:
-                result = json.loads(content_text)
-            except json.JSONDecodeError:
-                # 尝试从文本中提取 JSON 部分
-                import re
-                json_match = re.search(r'\{[\s\S]*?\}', content_text)
-                if json_match:
-                    try:
-                        result = json.loads(json_match.group())
-                    except json.JSONDecodeError as e2:
-                        logger.warning(f"[SentimentAnalyzer] JSON 提取失败: {e2}, 内容: {content_text[:200]}")
-                        result = {'sentiment': 'neutral', 'score': 0.0, 'confidence': 0.5, 'keywords': []}
-                else:
-                    logger.warning(f"[SentimentAnalyzer] 未找到 JSON: {content_text[:200]}")
-                    result = {'sentiment': 'neutral', 'score': 0.0, 'confidence': 0.5, 'keywords': []}
+            result = self._parse_json_response(content_text)
             
             # 标准化结果
-            sentiment = result.get('sentiment', 'neutral').lower() if isinstance(result.get('sentiment'), str) else 'neutral'
+            sentiment = result.get('sentiment', 'neutral')
+            if isinstance(sentiment, str):
+                sentiment = sentiment.lower().strip()
+            else:
+                sentiment = 'neutral'
+            
             if sentiment not in ['positive', 'neutral', 'negative']:
                 sentiment = 'neutral'
             
-            score = float(result.get('score', 0)) if isinstance(result.get('score'), (int, float, str)) else 0.0
+            score = float(result.get('score', 0)) if result.get('score') is not None else 0.0
             score = max(-1.0, min(1.0, score))
             
-            confidence = float(result.get('confidence', 0.5)) if isinstance(result.get('confidence'), (int, float, str)) else 0.5
+            confidence = float(result.get('confidence', 0.5)) if result.get('confidence') is not None else 0.5
             confidence = max(0.0, min(1.0, confidence))
             
-            keywords = result.get('keywords', []) if isinstance(result.get('keywords'), list) else []
+            keywords = result.get('keywords', [])
+            if not isinstance(keywords, list):
+                keywords = []
             
             return {
                 'sentiment': sentiment,
@@ -162,7 +157,7 @@ class SentimentAnalyzer:
             }
             
         except Exception as e:
-            logger.error(f"[SentimentAnalyzer] 情绪分析失败: {e}")
+            logger.error(f"[SentimentAnalyzer] 情绪分析失败: {e}, 内容: {content[:100]}")
             return {
                 'sentiment': 'neutral',
                 'score': 0.0,
@@ -170,28 +165,78 @@ class SentimentAnalyzer:
                 'keywords': []
             }
     
-    async def analyze_batch(self, contents: List[str]) -> List[Dict]:
-        """批量分析情绪"""
-        results = []
-        for content in contents:
-            result = await self.analyze(content)
-            results.append(result)
-        return results
+    def _parse_json_response(self, text: str) -> Dict:
+        """解析 AI 返回的 JSON 响应"""
+        # 首先尝试直接解析
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+        
+        # 尝试提取 JSON 块
+        # 查找花括号包裹的内容
+        match = re.search(r'\{[\s\S]*?\}', text)
+        if match:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                pass
+        
+        # 尝试提取键值对
+        result = {}
+        
+        # 提取 sentiment
+        sentiment_match = re.search(r'["\']?sentiment["\']?\s*:\s*["\']?(\w+)["\']?', text, re.IGNORECASE)
+        if sentiment_match:
+            result['sentiment'] = sentiment_match.group(1).lower()
+        
+        # 提取 score
+        score_match = re.search(r'["\']?score["\']?\s*:\s*([\d\.-]+)', text, re.IGNORECASE)
+        if score_match:
+            try:
+                result['score'] = float(score_match.group(1))
+            except ValueError:
+                result['score'] = 0.0
+        
+        # 提取 confidence
+        confidence_match = re.search(r'["\']?confidence["\']?\s*:\s*([\d\.-]+)', text, re.IGNORECASE)
+        if confidence_match:
+            try:
+                result['confidence'] = float(confidence_match.group(1))
+            except ValueError:
+                result['confidence'] = 0.5
+        
+        # 提取 keywords（简化处理）
+        keywords_match = re.search(r'["\']?keywords["\']?\s*:\s*\[(.*?)\]', text, re.IGNORECASE | re.DOTALL)
+        if keywords_match:
+            keywords_str = keywords_match.group(1)
+            # 提取引号中的词
+            keywords = re.findall(r'["\']([^"\']+)["\']', keywords_str)
+            result['keywords'] = keywords
+        
+        return result if result else {'sentiment': 'neutral', 'score': 0.0, 'confidence': 0.5, 'keywords': []}
 
 
+# 便捷函数
 def calculate_sentiment_index(positive: int, neutral: int, negative: int) -> float:
     """
-    计算情绪指数
+    计算情绪指数 (-1.0 到 1.0)
     
-    公式: (positive - negative) / total
-    范围: -1.0 (极度悲观) 到 +1.0 (极度乐观)
+    Args:
+        positive: 乐观回复数
+        neutral: 中性回复数
+        negative: 悲观回复数
+    
+    Returns:
+        情绪指数，范围 -1.0 (极度悲观) 到 1.0 (极度乐观)
     """
     total = positive + neutral + negative
     if total == 0:
         return 0.0
     
-    # 乐观 +1, 中性 0, 悲观 -1
-    index = (positive * 1 + neutral * 0 + negative * (-1)) / total
+    # 权重计算
+    index = (positive - negative) / total
+    
     return round(index, 2)
 
 
@@ -200,8 +245,8 @@ def aggregate_sentiment_by_date(replies: List[Dict]) -> Dict[str, Dict]:
     按日期聚合情绪数据
     
     Args:
-        replies: 回复列表，每个包含 sentiment, created_at 等
-        
+        replies: 回复列表，每项包含 'created_at' 和 'sentiment'
+    
     Returns:
         {
             '2026-02-07': {

@@ -12,9 +12,11 @@ sys.path.insert(0, '/app/src')
 
 from db.models import SessionLocal, ReplyArchive, init_db
 from sentiment_analyzer import SentimentAnalyzer
-from async_logger import AsyncLogger
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 

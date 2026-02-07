@@ -135,7 +135,7 @@
         </div>
     </nav>
 
-    <!-- 左侧悬浮导航 -->
+    <!-- 左侧悬浮导航 - AI分析页面 -->
     <div class="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 bg-card/90 backdrop-blur rounded-xl shadow-lg border p-2">
         <a href="/" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="监控">
             <i class="fas fa-satellite-dish"></i>
@@ -145,9 +145,6 @@
         </a>
         <a href="/data" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="数据">
             <i class="fas fa-database"></i>
-        </a>
-        <a href="/analytics" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="情绪分析">
-            <i class="fas fa-chart-line"></i>
         </a>
     </div>
 
@@ -160,13 +157,16 @@
             <div class="space-y-6">
                 <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
                     <div class="p-6 border-b bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">
-                            <i class="fas fa-cog text-purple-500"></i>
-                            AI 配置
-                        </h2>
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-lg font-semibold flex items-center gap-2">
+                                <i class="fas fa-cog text-purple-500"></i>
+                                AI 配置
+                            </h2>
+                            <span id="config-status" class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">未保存</span>
+                        </div>
                     </div>
                     <div class="p-6 space-y-4" id="ai-config">
-                        <!-- 动态加载 -->
+                        <!-- 动态加载配置表单 -->
                     </div>
                 </section>
 
@@ -201,16 +201,24 @@
                                 <!-- 动态加载 -->
                             </select>
                         </div>
-                        <div>
-                            <label class="text-sm font-medium">时间范围</label>
-                            <select id="single-time-range" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
-                                <option value="week">最近一周</option>
-                                <option value="month">最近一月</option>
-                                <option value="all">全部历史</option>
-                            </select>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-sm font-medium">时间范围</label>
+                                <select id="single-time-range" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
+                                    <option value="week">最近一周</option>
+                                    <option value="month">最近一月</option>
+                                    <option value="all">全部历史</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium">情绪周期</label>
+                                <button onclick="analyzeSentimentCycle()" class="w-full mt-1 px-3 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-lg font-medium hover:shadow-lg transition-all text-sm">
+                                    <i class="fas fa-wave-square mr-1"></i>分析周期
+                                </button>
+                            </div>
                         </div>
                         <button onclick="analyzeSingle()" class="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:shadow-lg transition-all">
-                            <i class="fas fa-play mr-2"></i>开始分析
+                            <i class="fas fa-play mr-2"></i>开始风格分析
                         </button>
                     </div>
                 </section>
@@ -300,33 +308,289 @@
             setTimeout(() => alert.classList.add('hidden'), 5000);
         }
 
+        // 当前配置缓存
+        let currentAIConfig = {};
+
         // 加载 AI 配置
         async function loadAIConfig() {
             try {
                 const res = await fetch('/api/ai/config');
                 const config = await res.json();
+                currentAIConfig = config;
+                
+                const hasKey = config.api_key || config.api_key_masked;
                 
                 document.getElementById('ai-config').innerHTML = `
-                    <div class="space-y-3">
-                        <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <span class="text-sm text-muted-foreground">提供商</span>
-                            <span class="font-medium">${config.provider || 'kimi'}</span>
+                    <div class="space-y-4">
+                        <!-- 当前模型显示 -->
+                        <div class="p-3 rounded-lg bg-gradient-to-r from-purple-500/10 to-indigo-500/10 border border-purple-200">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-robot text-purple-500"></i>
+                                    <span class="text-sm font-medium">当前模型</span>
+                                </div>
+                                <span class="text-sm font-bold text-purple-600">${config.model || '未配置'}</span>
+                            </div>
+                            <div class="mt-2 text-xs text-muted-foreground flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full ${config.api_key ? 'bg-green-500' : 'bg-red-500'}"></span>
+                                <span>${config.api_key ? 'API Key 已配置' : 'API Key 未配置'}</span>
+                            </div>
                         </div>
-                        <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <span class="text-sm text-muted-foreground">模型</span>
-                            <span class="font-medium">${config.model || 'moonshot-v1-8k'}</span>
+                        
+                        <!-- 提供商选择 -->
+                        <div class="space-y-1">
+                            <label class="text-sm font-medium">提供商</label>
+                            <select id="ai-provider" class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20" onchange="onProviderChange()">
+                                <option value="kimi" ${(config.provider || 'kimi') === 'kimi' ? 'selected' : ''}>Kimi (Moonshot)</option>
+                                <option value="openai" ${config.provider === 'openai' ? 'selected' : ''}>OpenAI</option>
+                                <option value="custom" ${config.provider === 'custom' ? 'selected' : ''}>自定义</option>
+                            </select>
                         </div>
-                        <div class="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                            <span class="text-sm text-muted-foreground">API Key</span>
-                            <span class="font-medium">${config.api_key_masked || '未配置'}</span>
+                        
+                        <!-- API Key 输入 -->
+                        <div class="space-y-1">
+                            <label class="text-sm font-medium">API Key</label>
+                            <div class="flex gap-2">
+                                <div class="relative flex-1">
+                                    <input type="password" id="ai-api-key" 
+                                        value="${config.api_key || ''}" 
+                                        placeholder="${config.api_key_masked || '输入 API Key'}"
+                                        class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 pr-10">
+                                    <button onclick="toggleApiKeyVisibility()" class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                                        <i class="fas fa-eye" id="api-key-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            ${config.api_key_masked ? `<p class="text-xs text-muted-foreground">当前: ${config.api_key_masked}</p>` : ''}
                         </div>
-                    </div>
-                    <div class="pt-4 border-t">
-                        <p class="text-xs text-muted-foreground">如需修改配置，请通过 API 或直接修改数据库</p>
+                        
+                        <!-- Base URL -->
+                        <div class="space-y-1">
+                            <label class="text-sm font-medium">Base URL</label>
+                            <input type="url" id="ai-base-url" 
+                                value="${config.base_url || 'https://api.moonshot.cn/v1'}" 
+                                placeholder="https://api.moonshot.cn/v1"
+                                class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20">
+                        </div>
+                        
+                        <!-- 模型选择 -->
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium">模型</label>
+                                <button onclick="fetchAvailableModels()" class="text-xs text-primary hover:underline flex items-center gap-1">
+                                    <i class="fas fa-sync-alt"></i> 获取可用模型
+                                </button>
+                            </div>
+                            <div class="flex gap-2">
+                                <select id="ai-model" class="flex-1 px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20">
+                                    <option value="">加载中...</option>
+                                </select>
+                            </div>
+                            <p id="model-loading" class="text-xs text-muted-foreground hidden">
+                                <i class="fas fa-spinner fa-spin"></i> 正在获取模型列表...
+                            </p>
+                        </div>
+                        
+                        <!-- 操作按钮 -->
+                        <div class="pt-4 border-t flex gap-2">
+                            <button onclick="saveAIConfig()" class="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all">
+                                <i class="fas fa-save mr-1"></i> 保存配置
+                            </button>
+                            <button onclick="testAIConfig()" class="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-muted transition-all">
+                                <i class="fas fa-vial mr-1"></i> 测试
+                            </button>
+                        </div>
                     </div>
                 `;
+                
+                // 初始化模型下拉框
+                updateModelOptions(config.model || 'moonshot-v1-8k');
             } catch (e) {
                 console.error('加载 AI 配置失败:', e);
+                document.getElementById('ai-config').innerHTML = `
+                    <div class="text-center py-4 text-muted-foreground">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p class="text-sm">加载配置失败</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // 切换 API Key 显示/隐藏
+        function toggleApiKeyVisibility() {
+            const input = document.getElementById('ai-api-key');
+            const icon = document.getElementById('api-key-eye');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+        
+        // 提供商改变时更新默认 Base URL
+        function onProviderChange() {
+            const provider = document.getElementById('ai-provider').value;
+            const baseUrlInput = document.getElementById('ai-base-url');
+            const modelSelect = document.getElementById('ai-model');
+            
+            const defaults = {
+                'kimi': 'https://api.moonshot.cn/v1',
+                'openai': 'https://api.openai.com/v1',
+                'custom': ''
+            };
+            
+            if (defaults[provider] && !baseUrlInput.value) {
+                baseUrlInput.value = defaults[provider];
+            }
+            
+            // 清空模型选择，等待获取
+            modelSelect.innerHTML = '<option value="">点击"获取可用模型"按钮加载</option>';
+        }
+        
+        // 更新模型选项
+        function updateModelOptions(currentModel) {
+            const select = document.getElementById('ai-model');
+            const provider = document.getElementById('ai-provider')?.value || 'kimi';
+            
+            const defaultModels = {
+                'kimi': [
+                    { value: 'moonshot-v1-8k', label: 'moonshot-v1-8k (8K)' },
+                    { value: 'moonshot-v1-32k', label: 'moonshot-v1-32k (32K)' },
+                    { value: 'moonshot-v1-128k', label: 'moonshot-v1-128k (128K)' }
+                ],
+                'openai': [
+                    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+                    { value: 'gpt-4', label: 'GPT-4' },
+                    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' }
+                ],
+                'custom': [
+                    { value: currentModel, label: currentModel || '自定义模型' }
+                ]
+            };
+            
+            const models = defaultModels[provider] || defaultModels['custom'];
+            select.innerHTML = models.map(m => 
+                `<option value="${m.value}" ${m.value === currentModel ? 'selected' : ''}>${m.label}</option>`
+            ).join('');
+        }
+        
+        // 获取可用模型列表
+        async function fetchAvailableModels() {
+            const provider = document.getElementById('ai-provider').value;
+            const baseUrl = document.getElementById('ai-base-url').value;
+            const apiKey = document.getElementById('ai-api-key').value;
+            const loadingEl = document.getElementById('model-loading');
+            const selectEl = document.getElementById('ai-model');
+            
+            if (!baseUrl || !apiKey) {
+                showAlert('请先填写 Base URL 和 API Key', 'error');
+                return;
+            }
+            
+            loadingEl.classList.remove('hidden');
+            selectEl.disabled = true;
+            
+            try {
+                const res = await fetch('/api/ai/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, base_url: baseUrl, api_key: apiKey })
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || '获取模型失败');
+                }
+                
+                const data = await res.json();
+                
+                // 更新模型下拉框
+                const currentModel = selectEl.value;
+                selectEl.innerHTML = data.models.map(m => 
+                    `<option value="${m.id}" ${m.id === currentModel ? 'selected' : ''}>${m.id}</option>`
+                ).join('');
+                
+                showAlert(`成功获取 ${data.models.length} 个可用模型`);
+            } catch (e) {
+                showAlert('获取模型失败: ' + e.message, 'error');
+                console.error('获取模型失败:', e);
+            } finally {
+                loadingEl.classList.add('hidden');
+                selectEl.disabled = false;
+            }
+        }
+        
+        // 保存 AI 配置
+        async function saveAIConfig() {
+            const config = {
+                provider: document.getElementById('ai-provider').value,
+                base_url: document.getElementById('ai-base-url').value,
+                api_key: document.getElementById('ai-api-key').value,
+                model: document.getElementById('ai-model').value
+            };
+            
+            if (!config.model) {
+                showAlert('请选择一个模型', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/ai/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (!res.ok) {
+                    throw new Error('保存失败');
+                }
+                
+                document.getElementById('config-status').textContent = '已保存';
+                document.getElementById('config-status').className = 'text-xs px-2 py-1 rounded-full bg-green-100 text-green-700';
+                showAlert('配置保存成功');
+                
+                // 重新加载以更新 masked key 显示
+                setTimeout(loadAIConfig, 500);
+            } catch (e) {
+                showAlert('保存配置失败: ' + e.message, 'error');
+            }
+        }
+        
+        // 测试 AI 配置
+        async function testAIConfig() {
+            const config = {
+                provider: document.getElementById('ai-provider').value,
+                base_url: document.getElementById('ai-base-url').value,
+                api_key: document.getElementById('ai-api-key').value,
+                model: document.getElementById('ai-model').value
+            };
+            
+            showAlert('正在测试连接...', 'warning');
+            
+            try {
+                // 简单的测试请求，验证 API Key 是否有效
+                const res = await fetch('/api/ai/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        provider: config.provider, 
+                        base_url: config.base_url, 
+                        api_key: config.api_key 
+                    })
+                });
+                
+                if (res.ok) {
+                    showAlert('连接测试成功！API Key 有效');
+                } else {
+                    const err = await res.json();
+                    throw new Error(err.detail || '连接失败');
+                }
+            } catch (e) {
+                showAlert('测试失败: ' + e.message, 'error');
             }
         }
 
@@ -582,6 +846,83 @@
         // 关闭弹窗
         function closeModal() {
             document.getElementById('result-modal').classList.add('hidden');
+        }
+
+        // 情绪周期分析
+        async function analyzeSentimentCycle() {
+            const targetId = document.getElementById('single-target').value;
+            const timeRange = document.getElementById('single-time-range').value;
+            
+            if (!targetId) {
+                showAlert('请选择用户', 'error');
+                return;
+            }
+            
+            showAlert('正在分析情绪周期，请稍候...', 'warning');
+            
+            try {
+                const days = timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 90;
+                const res = await fetch(`/api/ai/sentiment-cycle/${targetId}?days=${days}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.detail || '分析失败');
+                }
+                
+                const data = await res.json();
+                
+                document.getElementById('modal-title').textContent = `${data.target_name} - 情绪周期分析`;
+                document.getElementById('modal-content').innerHTML = `
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
+                                <p class="text-sm opacity-80">当前阶段</p>
+                                <p class="text-2xl font-bold mt-1">${data.cycle_analysis.current_phase}</p>
+                            </div>
+                            <div class="p-4 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white">
+                                <p class="text-sm opacity-80">情绪指数</p>
+                                <p class="text-2xl font-bold mt-1">${data.cycle_analysis.current_index}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 rounded-lg bg-muted/50">
+                            <h4 class="font-semibold mb-2 flex items-center gap-2">
+                                <i class="fas fa-robot text-primary"></i>AI 分析总结
+                            </h4>
+                            <p class="text-sm leading-relaxed">${data.cycle_analysis.summary}</p>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <h4 class="font-semibold mb-2 text-sm">关键转折点</h4>
+                                <ul class="space-y-1 text-sm">
+                                    ${data.cycle_analysis.turning_points.map(tp => `
+                                        <li class="flex items-center gap-2">
+                                            <span class="w-2 h-2 rounded-full ${tp.type === 'peak' ? 'bg-green-500' : 'bg-red-500'}"></span>
+                                            <span>${tp.date}: ${tp.description}</span>
+                                        </li>
+                                    `).join('') || '<li class="text-muted-foreground">暂无</li>'}
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="font-semibold mb-2 text-sm">预测建议</h4>
+                                <p class="text-sm text-muted-foreground">${data.cycle_analysis.prediction}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="text-xs text-muted-foreground pt-2 border-t">
+                            分析时间: ${new Date(data.created_at).toLocaleString('zh-CN')} | 置信度: ${(data.cycle_analysis.confidence * 100).toFixed(0)}%
+                        </div>
+                    </div>
+                `;
+                document.getElementById('result-modal').classList.remove('hidden');
+                
+            } catch (e) {
+                showAlert('分析失败: ' + e.message, 'error');
+            }
         }
 
         // 页面加载

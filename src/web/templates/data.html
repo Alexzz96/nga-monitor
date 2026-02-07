@@ -135,7 +135,7 @@
         </div>
     </nav>
 
-    <!-- 左侧悬浮导航 -->
+    <!-- 左侧悬浮导航 - 数据页面 -->
     <div class="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 bg-card/90 backdrop-blur rounded-xl shadow-lg border p-2">
         <a href="/" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="监控">
             <i class="fas fa-satellite-dish"></i>
@@ -145,9 +145,6 @@
         </a>
         <a href="/data" class="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center transition-all shadow-md" title="数据">
             <i class="fas fa-database"></i>
-        </a>
-        <a href="/analytics" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="情绪分析">
-            <i class="fas fa-chart-line"></i>
         </a>
     </div>
 
@@ -399,6 +396,24 @@
             }
         }
 
+        // 辅助函数：安全解析日期
+        function safeFormatDate(dateStr) {
+            if (!dateStr) return '-';
+            try {
+                // 处理 "26-01-12 09:05" 格式 -> "2026-01-12T09:05:00"
+                const match = dateStr.match(/(\d{2})-(\d{2})-(\d{2})(?:\s+(\d{2}):(\d{2}))?/);
+                if (match) {
+                    const [_, year, month, day, hour = '00', minute = '00'] = match;
+                    const fullYear = '20' + year;
+                    const isoStr = `${fullYear}-${month}-${day}T${hour}:${minute}:00`;
+                    return new Date(isoStr).toLocaleDateString('zh-CN');
+                }
+                return new Date(dateStr).toLocaleDateString('zh-CN');
+            } catch (e) {
+                return dateStr; // 返回原始字符串
+            }
+        }
+
         // 加载用户历史
         async function loadTargetHistory() {
             const targetId = document.getElementById('target-select').value;
@@ -407,20 +422,23 @@
             try {
                 // 加载统计
                 const statsRes = await fetch(`/api/archive/status/${targetId}`);
+                if (!statsRes.ok) {
+                    throw new Error(`API错误: ${statsRes.status}`);
+                }
                 const stats = await statsRes.json();
                 
                 document.getElementById('target-stats').innerHTML = `
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
                         <div class="p-4 rounded-xl bg-muted/50 text-center">
-                            <p class="text-2xl font-bold text-primary">${stats.total_archived}</p>
+                            <p class="text-2xl font-bold text-primary">${stats.total_archived || 0}</p>
                             <p class="text-sm text-muted-foreground">总存档</p>
                         </div>
                         <div class="p-4 rounded-xl bg-muted/50 text-center">
-                            <p class="text-2xl font-bold text-primary">${stats.latest_post_date ? new Date(stats.latest_post_date).toLocaleDateString('zh-CN') : '-'}</p>
+                            <p class="text-2xl font-bold text-primary">${safeFormatDate(stats.latest_post_date)}</p>
                             <p class="text-sm text-muted-foreground">最新</p>
                         </div>
                         <div class="p-4 rounded-xl bg-muted/50 text-center">
-                            <p class="text-2xl font-bold text-primary">${stats.earliest_post_date ? new Date(stats.earliest_post_date).toLocaleDateString('zh-CN') : '-'}</p>
+                            <p class="text-2xl font-bold text-primary">${safeFormatDate(stats.earliest_post_date)}</p>
                             <p class="text-sm text-muted-foreground">最早</p>
                         </div>
                         <div class="p-4 rounded-xl bg-muted/50 text-center">
@@ -432,6 +450,9 @@
                 
                 // 加载历史列表
                 const historyRes = await fetch(`/api/archive/history/${targetId}`);
+                if (!historyRes.ok) {
+                    throw new Error(`API错误: ${historyRes.status}`);
+                }
                 const history = await historyRes.json();
                 
                 if (!history.records || history.records.length === 0) {
@@ -447,11 +468,11 @@
                             ${history.records.map(r => `
                                 <div class="p-4 rounded-xl border hover:bg-muted/50 transition-all">
                                     <div class="flex items-start justify-between">
-                                        <div class="flex-1">
-                                            <p class="font-medium">${r.topic_title}</p>
-                                            <p class="text-sm text-muted-foreground mt-1">${r.post_date} · ${r.forum || '未知版块'}</p>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="font-medium truncate">${r.topic_title || '无标题'}</p>
+                                            <p class="text-sm text-muted-foreground mt-1">${r.post_date || '-'} · ${r.forum || '未知版块'}</p>
                                         </div>
-                                        <a href="${r.url}" target="_blank" class="p-2 rounded-lg hover:bg-primary/10 text-primary transition-all">
+                                        <a href="${r.url}" target="_blank" class="p-2 rounded-lg hover:bg-primary/10 text-primary transition-all ml-2 flex-shrink-0">
                                             <i class="fas fa-external-link-alt"></i>
                                         </a>
                                     </div>
@@ -459,12 +480,18 @@
                             `).join('')}
                         </div>
                         <div class="flex justify-center mt-4">
-                            <button class="px-4 py-2 border rounded-lg hover:bg-muted transition-all text-sm">加载更多</button>
+                            <button onclick="loadTargetHistory()" class="px-4 py-2 border rounded-lg hover:bg-muted transition-all text-sm">刷新</button>
                         </div>
                     `;
                 }
             } catch (e) {
                 console.error('加载历史失败:', e);
+                document.getElementById('target-stats').innerHTML = `
+                    <div class="p-4 rounded-xl bg-red-50 text-red-600 text-center">
+                        <i class="fas fa-exclamation-circle text-2xl mb-2"></i>
+                        <p>加载失败: ${e.message}</p>
+                    </div>
+                `;
             }
         }
 

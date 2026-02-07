@@ -1,7 +1,7 @@
 """
 AI 分析路由
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -235,3 +235,137 @@ async def delete_report(report_id: int, db: Session = Depends(get_db)):
     db.delete(report)
     db.commit()
     return {"success": True}
+
+
+@router.post("/sentiment-cycle/{target_id}")
+async def analyze_sentiment_cycle(
+    target_id: int,
+    days: int = Query(default=30, ge=7, le=90),
+    db: Session = Depends(get_db)
+):
+    """
+    使用 AI 分析用户情绪周期
+    """
+    from datetime import datetime, timezone
+    from db.models import ReplyArchive, MonitorTarget
+    from ai_analyzer import AIAnalyzer
+    from .analytics import _get_cycle_data_core
+    
+    # 获取用户信息
+    target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    # 获取周期数据（使用核心函数，不是API端点）
+    try:
+        cycle_data = _get_cycle_data_core(target_id, days, db)
+    except Exception as e:
+        import logging
+        logging.error(f"[SentimentCycle] 获取周期数据失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取周期数据失败: {str(e)}")
+    
+    if not cycle_data["daily_data"]:
+        raise HTTPException(status_code=400, detail="该时间段没有足够的数据进行分析")
+    
+    # 准备 AI 分析提示词
+    daily_summary = "\n".join([
+        f"{d['date']}: 指数{d['index']}, 发帖{d['reply_count']}条, 关键词: {', '.join(d['keywords'][:5])}"
+        for d in cycle_data["daily_data"][-14:]
+    ])
+    
+    stats = cycle_data["statistics"]
+    
+    prompt = f"""请分析以下用户的情绪周期数据，给出专业的投资情绪周期分析。
+
+用户: {cycle_data['target_name']}
+时间范围: {cycle_data['date_range']['start']} 至 {cycle_data['date_range']['end']}
+
+统计数据:
+- 平均情绪指数: {stats['avg_index']:.1f} (0-100, 50为中性)
+- 最高指数: {stats['max_index']:.1f}
+- 最低指数: {stats['min_index']:.1f}
+- 波动率: {stats['volatility']:.3f}
+
+每日数据(最近14天):
+{daily_summary}
+
+请输出 JSON 格式分析结果:
+{{
+    "current_phase": "当前阶段(底部/上升/顶部/下降/震荡)",
+    "current_index": {stats['avg_index']:.0f},
+    "summary": "100字以内的情绪周期分析总结",
+    "turning_points": [
+        {{"date": "日期", "type": "peak/bottom", "description": "转折点描述"}}
+    ],
+    "prediction": "对未来走势的预测和投资建议",
+    "confidence": 0.85
+}}
+
+分析要点:
+1. 当前处于情绪周期的哪个阶段
+2. 是否有明显的转折点
+3. 结合发帖量和关键词分析情绪变化原因
+4. 给出投资建议(仅作为情绪参考,不构成投资建议)"""
+    
+    try:
+        analyzer = AIAnalyzer()
+        messages = [
+            {"role": "system", "content": "你是一位专业的投资情绪分析师,擅长分析投资者情绪周期。"},
+            {"role": "user", "content": prompt}
+        ]
+        
+        import json
+        response = await analyzer._call_api(messages)
+        
+        if not response:
+            raise HTTPException(status_code=500, detail="AI 分析失败")
+        
+        content = response['choices'][0]['message']['content']
+        
+        # 记录 AI 原始响应以便调试
+        import logging
+        logging.info(f"[SentimentCycle] AI 原始响应: {content[:500]}...")
+        
+        try:
+            analysis = json.loads(content)
+        except json.JSONDecodeError as e1:
+            # 尝试提取 JSON
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', content)
+            if json_match:
+                try:
+                    analysis = json.loads(json_match.group())
+                except json.JSONDecodeError as e2:
+                    logging.error(f"[SentimentCycle] JSON 提取失败: {e2}, 内容: {json_match.group()[:200]}")
+                    # 返回一个默认结构，避免前端崩溃
+                    analysis = {
+                        "current_phase": "未知",
+                        "current_index": stats['avg_index'],
+                        "summary": f"AI 响应解析失败，原始响应: {content[:200]}...",
+                        "turning_points": [],
+                        "prediction": "请检查 AI 配置或稍后重试",
+                        "confidence": 0.0
+                    }
+            else:
+                logging.error(f"[SentimentCycle] 无法从响应中提取 JSON: {content[:200]}")
+                analysis = {
+                    "current_phase": "未知",
+                    "current_index": stats['avg_index'],
+                    "summary": "AI 未返回有效 JSON 格式",
+                    "turning_points": [],
+                    "prediction": "请检查 AI 配置或稍后重试",
+                    "confidence": 0.0
+                }
+        
+        return {
+            "target_name": cycle_data["target_name"],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "cycle_analysis": analysis
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import logging
+        logging.error(f"[SentimentCycle] 情绪周期分析失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
