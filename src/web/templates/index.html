@@ -763,7 +763,13 @@
                 if (res.ok) {
                     const data = await res.json();
                     document.getElementById('new-uid').value = data.uid;
-                    showAlert(`解析成功: UID ${data.uid}`);
+                    // 自动填充用户名（如果获取到）
+                    if (data.username) {
+                        document.getElementById('new-name').value = data.username;
+                        showAlert(`解析成功: ${data.username} (UID: ${data.uid})`);
+                    } else {
+                        showAlert(`解析成功: UID ${data.uid}`);
+                    }
                 } else {
                     const err = await res.json();
                     showAlert(err.detail || '解析失败', 'error');
