@@ -196,7 +196,7 @@ async def get_activity_heatmap(
     db: Session = Depends(get_db)
 ):
     """
-    获取活跃度热力图数据
+    获取活跃度热力图数据（基于实际发帖时间 post_date）
     
     Returns:
         {
@@ -224,13 +224,26 @@ async def get_activity_heatmap(
     end_date = datetime.now(timezone.utc)
     
     for reply in replies:
-        if reply.created_at:
-            # 计算日期索引
-            day_diff = (end_date.date() - reply.created_at.date()).days
-            if 0 <= day_diff < days:
-                day_index = days - 1 - day_diff  # 倒序，最新日期在最后
-                hour = reply.created_at.hour
-                hour_day_counts[hour][day_index] += 1
+        # 使用 post_date（实际发帖时间）而非 created_at（入库时间）
+        post_date_str = reply.post_date
+        if post_date_str:
+            try:
+                # 解析 post_date 格式: "26-02-07 13:19" 或 "25-12-31 15:41"
+                post_datetime = datetime.strptime(post_date_str, "%y-%m-%d %H:%M")
+                # 转换为 UTC 时间（假设 post_date 是本地时间 Asia/Shanghai）
+                from zoneinfo import ZoneInfo
+                post_datetime = post_datetime.replace(tzinfo=ZoneInfo("Asia/Shanghai"))
+                post_datetime_utc = post_datetime.astimezone(timezone.utc)
+                
+                # 计算日期索引
+                day_diff = (end_date.date() - post_datetime_utc.date()).days
+                if 0 <= day_diff < days:
+                    day_index = days - 1 - day_diff  # 倒序，最新日期在最后
+                    hour = post_datetime.hour  # 使用本地时间的小时
+                    hour_day_counts[hour][day_index] += 1
+            except (ValueError, AttributeError) as e:
+                # 解析失败，跳过
+                continue
     
     # 生成日期列表
     date_list = []
