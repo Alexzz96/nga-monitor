@@ -30,9 +30,25 @@ from web.routes.utils import parse_url
 app.post("/api/parse-url")(parse_url)
 
 # 向后兼容：日志端点别名
-from web.routes.stats import get_logs, cleanup_logs
+from web.routes.stats import get_logs, cleanup_logs, get_stats
 app.get("/api/logs")(get_logs)
 app.post("/api/logs/cleanup")(cleanup_logs)
+app.get("/api/stats")(get_stats)
+
+# 向后兼容：目标端点别名
+from web.routes.targets import get_targets, create_target
+app.get("/api/targets")(get_targets)
+app.post("/api/targets")(create_target)
+
+# 向后兼容：Cookie 状态端点
+from web.routes.utils import get_cookie_status
+app.get("/api/cookie-status")(get_cookie_status)
+
+# 向后兼容：Webhook 端点别名
+from web.routes.webhook import get_webhook, update_webhook, test_webhook
+app.get("/api/webhook")(get_webhook)
+app.post("/api/webhook")(update_webhook)
+app.post("/api/webhook/test")(test_webhook)
 
 STORAGE_STATE_PATH = Path(os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.json'))
 
