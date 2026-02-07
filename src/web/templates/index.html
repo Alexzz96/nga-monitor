@@ -580,11 +580,11 @@
                                 <button onclick="forceSendTarget(${t.id})" class="p-2 rounded-lg hover:bg-orange-500/10 text-orange-500 transition-all" title="强制发送">
                                     <i class="fas fa-paper-plane text-xs"></i>
                                 </button>
-                                <button onclick="toggleTarget(${t.id}, ${!t.enabled})" class="p-2 rounded-lg hover:bg-muted transition-all" title="${t.enabled ? '停止' : '启动'}">
-                                    <i class="fas ${t.enabled ? 'fa-pause' : 'fa-play'} text-xs"></i>
-                                </button>
                                 <button onclick="deleteTarget(${t.id})" class="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-all" title="删除">
                                     <i class="fas fa-trash-alt text-xs"></i>
+                                </button>
+                                <button onclick="toggleTarget(${t.id}, ${!t.enabled})" class="p-2 rounded-lg hover:bg-muted transition-all" title="${t.enabled ? '关闭' : '启动'}">
+                                    <i class="fas ${t.enabled ? 'fa-toggle-on text-blue-500' : 'fa-toggle-off text-red-400'} text-lg"></i>
                                 </button>
                             </div>
                         </td>
