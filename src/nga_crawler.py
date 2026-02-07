@@ -262,16 +262,20 @@ class NgaCrawler:
                 logger.debug(f"解析内容失败: {e}")
                 pass
             
-            # 时间
+            # 时间（使用回复时间，不是主题时间）
             post_date = ""
             post_datetime = None
             try:
                 date_elem = row.locator("td.c3 .postdate").first
+                # 优先使用 inner_text（回复时间），而非 title 属性（可能是主题时间）
                 post_date = await date_elem.inner_text()
+                post_date = post_date.strip()
                 
-                title_attr = await date_elem.get_attribute("title")
-                if title_attr:
-                    post_date = title_attr
+                # 如果 inner_text 为空或无效，才尝试 title 属性
+                if not post_date or len(post_date) < 5:
+                    title_attr = await date_elem.get_attribute("title")
+                    if title_attr:
+                        post_date = title_attr.strip()
                 
                 for fmt in ["%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
                     try:
