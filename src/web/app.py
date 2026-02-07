@@ -15,7 +15,7 @@ from db.models import (
     get_db, MonitorTarget, Config,
     init_db
 )
-from routes import api_router
+from web.routes import api_router
 
 init_db()
 

@@ -47,6 +47,7 @@ RUN mkdir -p /app/data
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
 ENV STORAGE_STATE_PATH=/app/data/storage_state.json
 ENV DB_PATH=/app/data/nga_monitor.db
 

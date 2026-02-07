@@ -88,14 +88,16 @@ async def main():
         logger.error("请先运行 export_nga_state.py 生成登录状态")
         sys.exit(1)
     
-    await start_scheduler()
-    
+    # 先启动 Web 服务器
     from web.app import app
     port = int(os.getenv('WEB_PORT', '12306'))
     logger.info(f"启动 Web 服务器，端口: {port}")
     
     config = UvicornConfig(app, host="0.0.0.0", port=port, log_level="warning")
     server = Server(config)
+    
+    # 启动调度器（在后台运行）
+    asyncio.create_task(start_scheduler())
     
     try:
         await server.serve()
