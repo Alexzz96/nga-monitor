@@ -135,17 +135,11 @@
         </div>
     </nav>
 
-    <!-- 左侧悬浮导航 - 数据页面 -->
+    <!-- 左侧悬浮导航 - 仅情绪趋势 -->
     <div class="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 bg-card/90 backdrop-blur rounded-xl shadow-lg border p-2">
-        <a href="/" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="监控">
-            <i class="fas fa-satellite-dish"></i>
-        </a>
-        <a href="/ai" class="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground transition-all" title="AI分析">
-            <i class="fas fa-robot"></i>
-        </a>
-        <a href="/data" class="w-10 h-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center transition-all shadow-md" title="数据">
-            <i class="fas fa-database"></i>
-        </a>
+        <button onclick="openSentimentModal()" class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:scale-105" title="情绪趋势">
+            <i class="fas fa-chart-line"></i>
+        </button>
     </div>
 
     <main class="container mx-auto px-4 py-8 max-w-7xl">
@@ -699,5 +693,222 @@
             setInterval(loadArchiveTasks, 10000);
         });
     </script>
+    <!-- 情绪趋势悬浮面板 -->
+    <div id="sentiment-modal" class="fixed inset-0 z-50 hidden">
+        <!-- 背景遮罩 -->
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="closeSentimentModal()"></div>
+        
+        <!-- 面板内容 -->
+        <div class="absolute right-0 top-0 h-full w-full max-w-5xl bg-background shadow-2xl transform transition-transform translate-x-full" id="sentiment-panel">
+            <!-- 面板头部 -->
+            <div class="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-card/95 backdrop-blur">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                        <i class="fas fa-chart-line text-lg"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold">情绪趋势分析</h2>
+                        <p class="text-xs text-muted-foreground">基于 AI 分析的用户情绪变化</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="last-update" class="text-xs text-muted-foreground"></span>
+                    <button onclick="refreshSentimentData()" class="p-2 rounded-lg hover:bg-muted transition-all" title="刷新">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button onclick="closeSentimentModal()" class="p-2 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all" title="关闭">
+                        <i class="fas fa-times text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 面板主体 -->
+            <div class="p-6 overflow-y-auto h-[calc(100vh-80px)]">
+                <!-- 时间范围选择 -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted-foreground">时间范围：</span>
+                        <div class="flex items-center gap-1 bg-muted rounded-lg p-1">
+                            <button onclick="setSentimentRange(7)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="7">7天</button>
+                            <button onclick="setSentimentRange(30)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md bg-background shadow-sm transition-all" data-days="30">30天</button>
+                            <button onclick="setSentimentRange(60)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="60">60天</button>
+                            <button onclick="setSentimentRange(90)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="90">90天</button>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-muted-foreground">用户筛选：</span>
+                        <select id="sentiment-target-filter" onchange="filterSentimentByTarget()" class="px-3 py-1.5 text-sm rounded-lg border bg-background">
+                            <option value="">所有用户</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 汇总卡片 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-blue-100 text-xs">总回复数</p>
+                                <p class="text-2xl font-bold mt-1" id="summary-total">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-comments text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-green-100 text-xs">已分析</p>
+                                <p class="text-2xl font-bold mt-1" id="summary-analyzed">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-brain text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-purple-100 text-xs">平均情绪</p>
+                                <p class="text-2xl font-bold mt-1" id="summary-sentiment">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-smile text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-orange-100 text-xs">最活跃日</p>
+                                <p class="text-sm font-bold mt-1" id="summary-active">-</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                <i class="fas fa-calendar-day text-lg"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 标签页导航 -->
+                <div class="flex items-center gap-1 bg-muted rounded-lg p-1 mb-6 w-fit">
+                    <button onclick="switchSentimentTab('trend')" id="tab-trend" class="sentiment-tab px-4 py-2 text-sm rounded-md bg-background shadow-sm transition-all">
+                        <i class="fas fa-chart-line mr-1"></i>情绪趋势
+                    </button>
+                    <button onclick="switchSentimentTab('cycle')" id="tab-cycle" class="sentiment-tab px-4 py-2 text-sm rounded-md transition-all text-muted-foreground hover:text-foreground">
+                        <i class="fas fa-wave-square mr-1"></i>周期指数
+                    </button>
+                </div>
+
+                <!-- 情绪趋势图 -->
+                <div id="panel-trend" class="sentiment-panel-content">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div class="lg:col-span-2 bg-card rounded-2xl p-6 shadow-sm border">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-semibold">
+                                    <i class="fas fa-chart-line text-primary mr-2"></i>情绪趋势
+                                </h3>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span>乐观</span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span>中性</span>
+                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>悲观</span>
+                                </div>
+                            </div>
+                            <div id="sentiment-chart" style="height: 350px;"></div>
+                        </div>
+                        
+                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
+                            <h3 class="font-semibold mb-4">
+                                <i class="fas fa-pie-chart text-primary mr-2"></i>情绪分布
+                            </h3>
+                            <div id="distribution-chart" style="height: 350px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- 活跃度热力图和关键词 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
+                            <h3 class="font-semibold mb-4">
+                                <i class="fas fa-fire text-primary mr-2"></i>活跃度热力图
+                            </h3>
+                            <div id="heatmap-chart" style="height: 300px;"></div>
+                        </div>
+                        
+                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
+                            <h3 class="font-semibold mb-4">
+                                <i class="fas fa-tags text-primary mr-2"></i>关键词情绪排行
+                            </h3>
+                            <div id="keywords-chart" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 周期指数面板 -->
+                <div id="panel-cycle" class="sentiment-panel-content hidden">
+                    <div class="bg-card rounded-2xl p-6 shadow-sm border mb-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-semibold">
+                                <i class="fas fa-wave-square text-primary mr-2"></i>情绪周期指数 (0-100)
+                            </h3>
+                            <div class="flex items-center gap-3 text-xs">
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500"></span>悲观区(&lt;30)</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-400"></span>中性区(30-70)</span>
+                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500"></span>乐观区(&gt;70)</span>
+                                <span class="flex items-center gap-1"><span class="w-4 h-0.5 bg-orange-500"></span>MA7均线</span>
+                            </div>
+                        </div>
+                        <div id="cycle-chart" style="height: 400px;"></div>
+                    </div>
+
+                    <!-- 周期统计卡片 -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-blue-100 text-xs">当前指数</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-current">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-tachometer-alt text-lg"></i>
+                                </div>
+                            </div>
+                            <p class="text-blue-100 text-xs mt-2" id="cycle-phase">阶段: -</p>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-green-100 text-xs">7日均值</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-ma7">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-chart-line text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-purple-100 text-xs">最高指数</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-max">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-arrow-up text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-orange-100 text-xs">最低指数</p>
+                                    <p class="text-2xl font-bold mt-1" id="cycle-min">-</p>
+                                </div>
+                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                    <i class="fas fa-arrow-down text-lg"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
 </body>
 </html>
