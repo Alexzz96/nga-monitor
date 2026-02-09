@@ -34,9 +34,7 @@ async def create_target(data: dict, db: Session = Depends(get_db)):
         name=data.get('name', f'用户 {uid}'),
         url=f'https://nga.178.com/thread.php?searchpost=1&authorid={uid}',
         enabled=data.get('enabled', True),
-        check_interval=data.get('check_interval', 60),
-        keywords=data.get('keywords', ''),
-        keyword_mode=data.get('keyword_mode', 'ANY')
+        check_interval=data.get('check_interval', 60)
     )
     db.add(target)
     db.commit()
@@ -57,10 +55,6 @@ async def update_target(target_id: int, data: dict, db: Session = Depends(get_db
         target.enabled = data['enabled']
     if 'check_interval' in data:
         target.check_interval = data['check_interval']
-    if 'keywords' in data:
-        target.keywords = data['keywords']
-    if 'keyword_mode' in data:
-        target.keyword_mode = data['keyword_mode']
     
     db.commit()
     db.refresh(target)

@@ -50,6 +50,8 @@ class DiscordSender:
             
             # 清理引用内容（去掉 +R by [...] (时间) 开头）
             if quote_content:
+                # 移除 +R by [用户名] (时间) 前缀
+                quote_content = re.sub(r'^\+R\s+by\s+\[[^\]]+\]\s*\([^)]+\)', '', quote_content).strip()
                 time_match = TIME_RE.search(quote_content)
                 if time_match:
                     quote_content = quote_content[time_match.end():].strip()
@@ -84,33 +86,34 @@ class DiscordSender:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
-            # 正文放在单独的 field 中，使用代码块和粗体使其更显眼
-            # Discord 中 ``` 代码块会显示为等宽字体，视觉上更突出
-            embed["fields"].append({
-                "name": "📝 正文回复",
-                "value": f"```{main_text[:1000]}```"[:1024],
-                "inline": False
-            })
+            # 字段1: 主题 + 引用（引用放在主题下方）
+            topic_field_parts = []
+            topic_field_parts.append(f"📌 **主题**\n{topic_title[:200]}")
             
-            # 次要信息区域
-            info_parts = []
-            info_parts.append(f"📌 **主题**\n{topic_title[:200]}")
-            
-            if reply_to_user:
-                reply_line = f"**回复对象**\n{reply_to_user}"
-                if reply_to_time:
-                    reply_line += f" ({reply_to_time})"
-                info_parts.append(reply_line)
-            
+            # 如果有引用内容，放在主题下方
             if quote_content:
-                quote_text = quote_content[:350]
-                if len(quote_content) > 350:
+                quote_text = quote_content[:250]
+                if len(quote_content) > 250:
                     quote_text += "..."
-                info_parts.append(f"**引用原文**\n{quote_text}")
+                topic_field_parts.append(f"💬 **引用**\n> {quote_text}")
+            
+            # 如果有回复对象信息
+            if reply_to_user:
+                reply_info = f"👤 **回复对象**: {reply_to_user}"
+                if reply_to_time:
+                    reply_info += f" ({reply_to_time})"
+                topic_field_parts.append(reply_info)
             
             embed["fields"].append({
                 "name": "─────────────────────────────",
-                "value": "\n\n".join(info_parts)[:1024],
+                "value": "\n\n".join(topic_field_parts)[:1024],
+                "inline": False
+            })
+            
+            # 字段2: 正文回复（放在主题/引用之后）
+            embed["fields"].append({
+                "name": "📝 正文回复",
+                "value": f"```{main_text[:1000]}```"[:1024],
                 "inline": False
             })
             

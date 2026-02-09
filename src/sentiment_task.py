@@ -171,12 +171,13 @@ async def analyze_recent_replies(days: int = 1):
 
 async def generate_daily_sentiment_summary(date_str: str = None):
     """
-    生成每日情绪汇总
+    生成每日情绪汇总 - 优化版 (使用 GROUP BY 减少查询次数)
     
     Args:
         date_str: 日期字符串 YYYY-MM-DD，默认为昨天
     """
     from db.models import SentimentAnalysis, MonitorTarget
+    from sqlalchemy import func, case
     
     init_db()
     db = SessionLocal()
@@ -187,41 +188,48 @@ async def generate_daily_sentiment_summary(date_str: str = None):
             yesterday = datetime.now(timezone.utc) - timedelta(days=1)
             date_str = yesterday.strftime('%Y-%m-%d')
         
-        logger.info(f"[SentimentTask] 生成 {date_str} 情绪汇总")
+        logger.info(f"[SentimentTask] 生成 {date_str} 情绪汇总 (优化版)")
         
-        # 获取所有目标
-        targets = db.query(MonitorTarget).all()
+        # 优化: 使用 GROUP BY 一次查询所有目标的统计数据 (替代循环中的多次查询)
+        stats = db.query(
+            ReplyArchive.target_id,
+            func.count().label('total'),
+            func.sum(case((ReplyArchive.sentiment == 'positive', 1), else_=0)).label('positive'),
+            func.sum(case((ReplyArchive.sentiment == 'negative', 1), else_=0)).label('negative'),
+            func.sum(case((ReplyArchive.sentiment == 'neutral', 1), else_=0)).label('neutral')
+        ).filter(
+            ReplyArchive.sentiment.isnot(None),  # 已分析
+            ReplyArchive.created_at >= f"{date_str} 00:00:00",
+            ReplyArchive.created_at < f"{date_str} 23:59:59"
+        ).group_by(ReplyArchive.target_id).all()
         
-        for target in targets:
-            # 查询该目标当天的回复
-            replies = db.query(ReplyArchive).filter(
-                ReplyArchive.target_id == target.id,
-                ReplyArchive.sentiment.isnot(None),  # 已分析
-                ReplyArchive.created_at >= f"{date_str} 00:00:00",
-                ReplyArchive.created_at < f"{date_str} 23:59:59"
+        logger.info(f"[SentimentTask] 查询到 {len(stats)} 个目标的统计数据")
+        
+        # 批量查询现有的汇总记录
+        existing_summaries = {
+            s.target_id: s for s in db.query(SentimentAnalysis).filter(
+                SentimentAnalysis.date == date_str
             ).all()
+        }
+        
+        # 更新或创建汇总记录
+        from sentiment_analyzer import calculate_sentiment_index
+        for row in stats:
+            target_id = row.target_id
+            total = row.total or 0
+            positive = row.positive or 0
+            negative = row.negative or 0
+            neutral = row.neutral or 0
             
-            if not replies:
+            if total == 0:
                 continue
             
-            # 统计
-            positive = sum(1 for r in replies if r.sentiment == 'positive')
-            negative = sum(1 for r in replies if r.sentiment == 'negative')
-            neutral = sum(1 for r in replies if r.sentiment == 'neutral')
-            total = len(replies)
-            
             # 计算情绪指数
-            from sentiment_analyzer import calculate_sentiment_index
             index = calculate_sentiment_index(positive, neutral, negative)
             
-            # 查找或创建记录
-            summary = db.query(SentimentAnalysis).filter(
-                SentimentAnalysis.target_id == target.id,
-                SentimentAnalysis.date == date_str
-            ).first()
-            
-            if summary:
-                # 更新
+            if target_id in existing_summaries:
+                # 更新现有记录
+                summary = existing_summaries[target_id]
                 summary.total_replies = total
                 summary.positive_count = positive
                 summary.neutral_count = neutral
@@ -229,9 +237,9 @@ async def generate_daily_sentiment_summary(date_str: str = None):
                 summary.sentiment_index = index
                 summary.updated_at = datetime.now(timezone.utc)
             else:
-                # 创建
+                # 创建新记录
                 summary = SentimentAnalysis(
-                    target_id=target.id,
+                    target_id=target_id,
                     date=date_str,
                     total_replies=total,
                     positive_count=positive,
@@ -243,11 +251,12 @@ async def generate_daily_sentiment_summary(date_str: str = None):
                 db.add(summary)
         
         db.commit()
-        logger.info(f"[SentimentTask] {date_str} 情绪汇总生成完成")
+        logger.info(f"[SentimentTask] {date_str} 情绪汇总生成完成, 共 {len(stats)} 个目标")
         
     except Exception as e:
         logger.error(f"[SentimentTask] 生成汇总失败: {e}")
         db.rollback()
+        raise
     finally:
         db.close()
 

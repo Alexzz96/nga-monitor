@@ -1,56 +1,50 @@
 """
-Webhook 路由
+Webhook 路由 - 兼容层，重定向到 webhooks.py
+旧版 API 保留用于兼容性
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from db.models import get_db, Config
-from discord_sender import DiscordSender
+from db.models import get_db
+from .webhooks import router as new_router
 
 router = APIRouter(prefix="/api/webhook", tags=["webhook"])
 
 
 @router.get("/")
-async def get_webhook(db: Session = Depends(get_db)):
-    """获取 webhook URL"""
-    webhook = Config.get_webhook(db)
-    return {"webhook": webhook}
+async def get_webhook_compat(db: Session = Depends(get_db)):
+    """获取默认 webhook URL (兼容旧版)"""
+    from db.models import Webhook
+    webhook = db.query(Webhook).filter(Webhook.is_default == True, Webhook.enabled == True).first()
+    if webhook:
+        return {"webhook": webhook.url}
+    return {"webhook": None}
 
 
 @router.post("/")
-async def update_webhook(data: dict, db: Session = Depends(get_db)):
-    """更新 webhook URL"""
+async def update_webhook_compat(data: dict, db: Session = Depends(get_db)):
+    """更新 webhook (兼容旧版，重定向到新API)"""
+    # 转发到新API
+    from .webhooks import create_webhook, update_webhook
+    
     url = data.get('url', '').strip()
     if not url:
-        raise HTTPException(status_code=400, detail="URL 不能为空")
+        raise HTTPException(status_code=400, detail="请输入内容")
     
-    Config.set_webhook(db, url)
-    return {"success": True}
+    # 检查是否已有默认 webhook
+    from db.models import Webhook
+    existing = db.query(Webhook).filter(Webhook.is_default == True).first()
+    
+    if existing:
+        # 更新现有
+        return await update_webhook(existing.id, {"url": url}, db)
+    else:
+        # 创建新的
+        return await create_webhook({"name": "默认", "url": url, "is_default": True}, db)
 
 
 @router.post("/test")
-async def test_webhook(db: Session = Depends(get_db)):
-    """测试 webhook"""
-    from datetime import datetime, timezone
-    
-    webhook = Config.get_webhook(db)
-    if not webhook:
-        raise HTTPException(status_code=400, detail="Webhook 未配置")
-    
-    sender = DiscordSender(webhook)
-    test_data = {
-        "topic_title": "[测试] Webhook 连接测试",
-        "url": "https://nga.178.com",
-        "forum": "[测试版块]",
-        "post_date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
-        "content_full": "这是一条测试消息，验证 Webhook 配置是否正确。",
-        "images": [],
-        "tid": "test",
-        "pid": "test"
-    }
-    
-    success = await sender.send_reply(test_data)
-    if success:
-        return {"success": True, "message": "测试消息已发送"}
-    else:
-        raise HTTPException(status_code=500, detail="发送失败")
+async def test_webhook_compat(db: Session = Depends(get_db)):
+    """测试默认 webhook (兼容旧版)"""
+    from .webhooks import test_default_webhook
+    return await test_default_webhook(db)

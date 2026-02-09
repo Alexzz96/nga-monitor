@@ -131,16 +131,10 @@
                 <a href="/data" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-all bg-primary text-primary-foreground shadow-md">
                     <i class="fas fa-database mr-2"></i>数据
                 </a>
+                </a>
             </div>
         </div>
     </nav>
-
-    <!-- 左侧悬浮导航 - 仅情绪趋势 -->
-    <div class="fixed left-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 bg-card/90 backdrop-blur rounded-xl shadow-lg border p-2">
-        <button onclick="openSentimentModal()" class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center transition-all shadow-md hover:shadow-lg hover:scale-105" title="情绪趋势">
-            <i class="fas fa-chart-line"></i>
-        </button>
-    </div>
 
     <main class="container mx-auto px-4 py-8 max-w-7xl">
         <!-- 提示框 -->
@@ -234,10 +228,20 @@
 
                 <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
                     <div class="p-6 border-b">
-                        <h2 class="text-lg font-semibold flex items-center gap-2">
-                            <i class="fas fa-tasks text-blue-500"></i>
-                            归档任务
-                        </h2>
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-lg font-semibold flex items-center gap-2">
+                                <i class="fas fa-tasks text-blue-500"></i>
+                                归档任务
+                            </h2>
+                            <div class="flex gap-2">
+                                <button type="button" id="btn-refresh-tasks" class="p-2 rounded-lg border hover:bg-muted transition-all" title="刷新">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                                <button type="button" id="btn-cleanup-tasks" class="p-2 rounded-lg border hover:bg-amber-50 hover:border-amber-300 transition-all text-amber-600" title="清理任务">
+                                    <i class="fas fa-broom"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     <div id="archive-tasks" class="p-6">
                         <!-- 动态加载 -->
@@ -262,18 +266,29 @@
                             </div>
                         </div>
                         
-                        <div>
-                            <label class="text-sm font-medium">保留天数</label>
-                            <select id="cleanup-days" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
-                                <option value="30">保留最近 30 天</option>
-                                <option value="90">保留最近 90 天</option>
-                                <option value="180">保留最近 180 天</option>
-                                <option value="365">保留最近 365 天</option>
-                            </select>
+                        <!-- 指定用户清理 -->
+                        <div class="border-t pt-4">
+                            <h3 class="text-sm font-medium mb-3">指定用户清理</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-sm text-muted-foreground">选择用户</label>
+                                    <select id="cleanup-user-target" class="w-full mt-1 px-3 py-2 rounded-lg border bg-background">
+                                        <option value="">请选择用户</option>
+                                    </select>
+                                </div>
+                                <button onclick="cleanupUserArchive()" class="w-full px-4 py-2 bg-gradient-to-r from-orange-400 to-red-500 text-white rounded-lg font-medium hover:shadow-lg transition-all">
+                                    <i class="fas fa-user-times mr-2"></i>清理该用户数据
+                                </button>
+                            </div>
                         </div>
-                        <button onclick="cleanupArchive()" class="w-full px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg font-medium hover:shadow-lg transition-all">
-                            <i class="fas fa-trash-alt mr-2"></i>清理旧数据
-                        </button>
+                        
+                        <!-- 全部清理 -->
+                        <div class="border-t pt-4">
+                            <h3 class="text-sm font-medium mb-3">全部数据清理</h3>
+                            <button onclick="cleanupAllArchive()" class="w-full px-4 py-2 bg-gradient-to-r from-red-500 to-red-700 text-white rounded-lg font-medium hover:shadow-lg transition-all">
+                                <i class="fas fa-trash-alt mr-2"></i>清理全部数据
+                            </button>
+                        </div>
                     </div>
                 </section>
 
@@ -303,6 +318,40 @@
                         <button onclick="exportData()" class="w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-600 text-white rounded-lg font-medium hover:shadow-lg transition-all">
                             <i class="fas fa-download mr-2"></i>导出 JSON
                         </button>
+                    </div>
+                </section>
+
+                <!-- 任务清理 -->
+                <section class="bg-card rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-6 border-b bg-gradient-to-r from-amber-500/10 to-orange-500/10">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i class="fas fa-broom text-amber-500"></i>
+                            任务清理
+                        </h2>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                            <p class="text-xs text-amber-700 dark:text-amber-300">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                清理运行时间超过30分钟的卡住任务
+                            </p>
+                        </div>
+                        
+                        <div id="cleanup-tasks-status" class="hidden p-3 rounded-xl bg-muted/50 text-sm">
+                            <div class="flex items-center gap-2">
+                                <i class="fas fa-spinner fa-spin text-amber-500"></i>
+                                <span id="cleanup-tasks-text">正在检查...</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2">
+                            <button onclick="previewStuckTasks()" class="flex-1 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-all text-sm">
+                                <i class="fas fa-eye mr-1"></i>预览
+                            </button>
+                            <button onclick="cleanupStuckTasks()" class="flex-1 px-3 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg font-medium hover:shadow-lg transition-all text-sm">
+                                <i class="fas fa-broom mr-1"></i>清理
+                            </button>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -385,6 +434,7 @@
                 document.getElementById('target-select').innerHTML = '<option value="">选择用户</option>' + options;
                 document.getElementById('archive-target').innerHTML = '<option value="">请选择</option>' + options;
                 document.getElementById('export-target').innerHTML = '<option value="">请选择</option>' + options;
+                document.getElementById('cleanup-user-target').innerHTML = '<option value="">请选择用户</option>' + options;
             } catch (e) {
                 console.error('加载用户失败:', e);
             }
@@ -594,6 +644,9 @@
             try {
                 showAlert('已开始抓取历史数据', 'warning');
                 
+                // 显示进度面板
+                openArchiveProgressModal();
+                
                 const res = await fetch(`/api/archive/history/${targetId}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -603,14 +656,145 @@
                 if (res.ok) {
                     const data = await res.json();
                     showAlert(data.message);
-                    loadArchiveTasks();
+                    // 开始轮询进度
+                    startArchiveProgressPolling();
                 } else {
                     const err = await res.json();
                     showAlert(err.detail || '启动失败', 'error');
+                    closeArchiveProgressModal();
                 }
             } catch (e) {
                 showAlert('请求失败', 'error');
+                closeArchiveProgressModal();
             }
+        }
+        
+        // 归档进度面板控制
+        let archiveProgressInterval = null;
+        
+        function openArchiveProgressModal() {
+            document.getElementById('archive-progress-modal').classList.remove('hidden');
+            document.getElementById('archive-progress-info').classList.remove('hidden');
+            document.getElementById('archive-progress-complete').classList.add('hidden');
+            resetArchiveProgress();
+        }
+        
+        function closeArchiveProgressModal() {
+            document.getElementById('archive-progress-modal').classList.add('hidden');
+            if (archiveProgressInterval) {
+                clearInterval(archiveProgressInterval);
+                archiveProgressInterval = null;
+            }
+        }
+        
+        function resetArchiveProgress() {
+            const logContainer = document.getElementById('archive-log-content');
+            if (logContainer) {
+                logContainer.innerHTML = '<div class="text-muted-foreground">等待开始...</div>';
+            }
+            document.getElementById('archive-progress-status').textContent = '准备中...';
+            document.getElementById('archive-pages-text').textContent = '0/0 页';
+            document.getElementById('archive-pages-bar').style.width = '0%';
+            document.getElementById('archive-total-replies').textContent = '0';
+            document.getElementById('archive-new-count').textContent = '0';
+            document.getElementById('archive-skip-count').textContent = '0';
+        }
+        
+        function startArchiveProgressPolling() {
+            console.log('[Archive Progress] 开始轮询');
+            // 立即获取一次进度
+            updateArchiveProgress();
+            
+            // 每4秒轮询一次
+            archiveProgressInterval = setInterval(updateArchiveProgress, 4000);
+        }
+        
+        async function updateArchiveProgress() {
+            try {
+                console.log('[Archive Progress] 获取进度...');
+                const res = await fetch('/api/archive/tasks?limit=5');
+                const data = await res.json();
+                
+                console.log('[Archive Progress] 任务数据:', data);
+                
+                if (!data.tasks || data.tasks.length === 0) {
+                    console.log('[Archive Progress] 无任务数据');
+                    return;
+                }
+                
+                // 获取最新的 running 任务
+                const runningTask = data.tasks.find(t => t.status === 'running');
+                const latestTask = runningTask || data.tasks[0];
+                
+                console.log('[Archive Progress] 当前任务:', latestTask);
+                
+                // 更新页面进度
+                const pagesPercent = latestTask.total_pages > 0 ? (latestTask.completed_pages / latestTask.total_pages * 100) : 0;
+                document.getElementById('archive-pages-text').textContent = `${latestTask.completed_pages}/${latestTask.total_pages} 页`;
+                document.getElementById('archive-pages-bar').style.width = `${pagesPercent}%`;
+                
+                // 更新回复数
+                document.getElementById('archive-total-replies').textContent = latestTask.total_replies || 0;
+                document.getElementById('archive-new-count').textContent = latestTask.archived_count || 0;
+                document.getElementById('archive-skip-count').textContent = latestTask.skipped_count || 0;
+                
+                // 解析并显示详细日志
+                if (latestTask.error_message && latestTask.error_message.includes('|')) {
+                    const [stage, detail] = latestTask.error_message.split('|');
+                    document.getElementById('archive-progress-status').textContent = `${stage}`;
+                    
+                    // 添加到日志
+                    const logEntry = `[${new Date().toLocaleTimeString()}] ${stage}: ${detail}`;
+                    const logContainer = document.getElementById('archive-log-content');
+                    if (logContainer && !logContainer.innerHTML.includes(logEntry)) {
+                        const logDiv = document.createElement('div');
+                        logDiv.className = 'py-0.5 border-b border-muted/30 last:border-0';
+                        logDiv.textContent = logEntry;
+                        logContainer.appendChild(logDiv);
+                        // 限制日志条数
+                        while (logContainer.children.length > 20) {
+                            logContainer.removeChild(logContainer.firstChild);
+                        }
+                        // 自动滚动
+                        logContainer.scrollTop = logContainer.scrollHeight;
+                    }
+                } else if (latestTask.status === 'running') {
+                    document.getElementById('archive-progress-status').textContent = 
+                        `抓取中 (${Math.round(pagesPercent)}%)`;
+                } else if (latestTask.status === 'completed') {
+                    document.getElementById('archive-progress-status').textContent = '已完成';
+                    showArchiveComplete(latestTask);
+                    if (archiveProgressInterval) {
+                        clearInterval(archiveProgressInterval);
+                        archiveProgressInterval = null;
+                    }
+                } else if (latestTask.status === 'failed') {
+                    document.getElementById('archive-progress-status').textContent = '失败';
+                    document.getElementById('archive-progress-status').classList.add('text-red-500');
+                    if (archiveProgressInterval) {
+                        clearInterval(archiveProgressInterval);
+                        archiveProgressInterval = null;
+                    }
+                }
+                
+                // 刷新任务列表
+                loadArchiveTasks();
+                
+            } catch (e) {
+                console.error('[Archive Progress] 获取进度失败:', e);
+            }
+        }
+        
+        function showArchiveComplete(task) {
+            document.getElementById('archive-progress-info').classList.add('hidden');
+            document.getElementById('archive-progress-complete').classList.remove('hidden');
+            document.getElementById('archive-complete-stats').textContent = 
+                `新增 ${task.archived_count || 0} 条，跳过 ${task.skipped_count || 0} 条`;
+            
+            // 2秒后自动关闭悬浮窗
+            setTimeout(() => {
+                closeArchiveProgressModal();
+            }, 2000);
         }
 
         // 清理数据
@@ -640,6 +824,89 @@
                 }
             } catch (e) {
                 showAlert('请求失败', 'error');
+            }
+        }
+
+        // 清理指定用户数据
+        async function cleanupUserArchive() {
+            const targetId = document.getElementById('cleanup-user-target').value;
+            
+            if (!targetId) {
+                showAlert('请先选择用户', 'error');
+                return;
+            }
+            
+            const targetName = document.getElementById('cleanup-user-target').options[document.getElementById('cleanup-user-target').selectedIndex].text;
+            
+            if (!confirm(`确定要删除用户 "${targetName}" 的所有归档数据吗？\n\n此操作不可恢复！`)) {
+                return;
+            }
+            
+            if (!confirm('最后确认：该用户的所有回复数据将被永久删除！')) {
+                return;
+            }
+            
+            try {
+                showAlert('正在清理...', 'warning');
+                
+                const res = await fetch(`/api/archive/cleanup-user/${targetId}`, {
+                    method: 'POST'
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    showAlert(`已删除 ${data.deleted_count} 条数据`);
+                    loadOverview();
+                    loadTargetHistory();
+                    loadArchiveTasks();
+                } else {
+                    let errMsg = '清理失败';
+                    try {
+                        const err = await res.json();
+                        errMsg = err.detail || err.message || JSON.stringify(err);
+                    } catch (e) {
+                        errMsg = await res.text() || '清理失败';
+                    }
+                    showAlert(errMsg, 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+
+        // 清理全部数据
+        async function cleanupAllArchive() {
+            if (!confirm('⚠️ 确定要删除所有用户的全部归档数据吗？\n\n此操作不可恢复！')) {
+                return;
+            }
+            
+            try {
+                showAlert('正在清理全部数据...', 'warning');
+                
+                const res = await fetch('/api/archive/cleanup-all', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({confirm: true})
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    showAlert(`已清理 ${data.deleted} 条数据`, 'success');
+                    loadOverview();
+                    loadTargetHistory();
+                    loadArchiveTasks();
+                } else {
+                    let errMsg = '清理失败';
+                    try {
+                        const err = await res.json();
+                        errMsg = err.detail || err.message || JSON.stringify(err);
+                    } catch (e) {
+                        errMsg = await res.text() || '清理失败';
+                    }
+                    showAlert(errMsg, 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败: ' + e.message, 'error');
             }
         }
 
@@ -683,232 +950,284 @@
             }
         }
 
+        // 任务清理弹窗
+        function showTaskCleanupModal() {
+            document.getElementById('task-cleanup-modal').classList.remove('hidden');
+            document.getElementById('task-cleanup-preview').classList.add('hidden');
+            // 重置复选框
+            document.getElementById('cleanup-running-tasks').checked = false;
+            document.getElementById('cleanup-completed-tasks').checked = false;
+            document.getElementById('cleanup-failed-tasks').checked = false;
+        }
+        
+        function closeTaskCleanupModal() {
+            document.getElementById('task-cleanup-modal').classList.add('hidden');
+        }
+
         // 页面加载
         document.addEventListener('DOMContentLoaded', function() {
             loadOverview();
             loadTargets();
             loadArchiveTasks();
             
+            // 绑定归档任务区域的按钮事件
+            const btnRefreshTasks = document.getElementById('btn-refresh-tasks');
+            const btnCleanupTasks = document.getElementById('btn-cleanup-tasks');
+            
+            if (btnRefreshTasks) {
+                btnRefreshTasks.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loadArchiveTasks();
+                });
+            }
+            
+            if (btnCleanupTasks) {
+                btnCleanupTasks.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showTaskCleanupModal();
+                });
+            }
+            
             // 定时刷新任务状态
             setInterval(loadArchiveTasks, 10000);
         });
-    </script>
-    <!-- 情绪趋势悬浮面板 -->
-    <div id="sentiment-modal" class="fixed inset-0 z-50 hidden">
-        <!-- 背景遮罩 -->
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="closeSentimentModal()"></div>
         
-        <!-- 面板内容 -->
-        <div class="absolute right-0 top-0 h-full w-full max-w-5xl bg-background shadow-2xl transform transition-transform translate-x-full" id="sentiment-panel">
-            <!-- 面板头部 -->
-            <div class="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b bg-card/95 backdrop-blur">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
-                        <i class="fas fa-chart-line text-lg"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold">情绪趋势分析</h2>
-                        <p class="text-xs text-muted-foreground">基于 AI 分析的用户情绪变化</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span id="last-update" class="text-xs text-muted-foreground"></span>
-                    <button onclick="refreshSentimentData()" class="p-2 rounded-lg hover:bg-muted transition-all" title="刷新">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                    <button onclick="closeSentimentModal()" class="p-2 rounded-lg hover:bg-red-100 hover:text-red-600 transition-all" title="关闭">
-                        <i class="fas fa-times text-lg"></i>
+        // 预览要清理的任务
+        async function previewTasksToCleanup() {
+            const running = document.getElementById('cleanup-running-tasks').checked;
+            const completed = document.getElementById('cleanup-completed-tasks').checked;
+            const failed = document.getElementById('cleanup-failed-tasks').checked;
+            
+            if (!running && !completed && !failed) {
+                showAlert('请至少选择一种任务类型', 'warning');
+                return;
+            }
+            
+            const previewDiv = document.getElementById('task-cleanup-preview');
+            previewDiv.classList.remove('hidden');
+            previewDiv.innerHTML = '<p><i class="fas fa-spinner fa-spin mr-2"></i>正在统计...</p>';
+            
+            try {
+                const res = await fetch('/api/archive/tasks?limit=100');
+                const data = await res.json();
+                
+                let counts = {running: 0, completed: 0, failed: 0};
+                data.tasks.forEach(t => {
+                    if (t.status === 'running') counts.running++;
+                    if (t.status === 'completed') counts.completed++;
+                    if (t.status === 'failed') counts.failed++;
+                });
+                
+                let total = 0;
+                let details = [];
+                if (running) {
+                    total += counts.running;
+                    details.push(`执行中: ${counts.running}`);
+                }
+                if (completed) {
+                    total += counts.completed;
+                    details.push(`已完成: ${counts.completed}`);
+                }
+                if (failed) {
+                    total += counts.failed;
+                    details.push(`失败: ${counts.failed}`);
+                }
+                
+                previewDiv.innerHTML = `
+                    <p class="font-medium">将清理 ${total} 个任务</p>
+                    <p class="text-xs text-muted-foreground mt-1">${details.join(', ')}</p>
+                `;
+            } catch (e) {
+                previewDiv.innerHTML = '<p class="text-red-500">统计失败</p>';
+            }
+        }
+        
+        // 执行任务清理
+        async function executeTaskCleanup() {
+            const running = document.getElementById('cleanup-running-tasks').checked;
+            const completed = document.getElementById('cleanup-completed-tasks').checked;
+            const failed = document.getElementById('cleanup-failed-tasks').checked;
+            
+            if (!running && !completed && !failed) {
+                showAlert('请至少选择一种任务类型', 'warning');
+                return;
+            }
+            
+            const statusList = [];
+            const statuses = [];
+            if (running) {
+                statusList.push('执行中');
+                statuses.push('running');
+            }
+            if (completed) {
+                statusList.push('已完成');
+                statuses.push('completed');
+            }
+            if (failed) {
+                statusList.push('失败');
+                statuses.push('failed');
+            }
+            
+            if (!confirm(`确定要清理以下类型的任务吗？\n\n${statusList.join('、')}\n\n注意：这将永久删除任务记录`)) {
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/archive/tasks/cleanup-all', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({statuses: statuses})
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    closeTaskCleanupModal();
+                    loadArchiveTasks(); // 刷新任务列表
+                } else {
+                    showAlert('清理失败: ' + (data.detail || '未知错误'), 'error');
+                }
+            } catch (e) {
+                showAlert('清理失败', 'error');
+            }
+        }
+    </script>
+    
+    <!-- 任务清理弹窗 -->
+    <div id="task-cleanup-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-card rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div class="p-6 border-b bg-gradient-to-r from-amber-500/10 to-orange-500/10">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <i class="fas fa-broom text-amber-500"></i>
+                        清理任务
+                    </h3>
+                    <button onclick="closeTaskCleanupModal()" class="p-2 rounded-lg hover:bg-muted transition-all">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
             
-            <!-- 面板主体 -->
-            <div class="p-6 overflow-y-auto h-[calc(100vh-80px)]">
-                <!-- 时间范围选择 -->
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-muted-foreground">时间范围：</span>
-                        <div class="flex items-center gap-1 bg-muted rounded-lg p-1">
-                            <button onclick="setSentimentRange(7)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="7">7天</button>
-                            <button onclick="setSentimentRange(30)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md bg-background shadow-sm transition-all" data-days="30">30天</button>
-                            <button onclick="setSentimentRange(60)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="60">60天</button>
-                            <button onclick="setSentimentRange(90)" class="sentiment-range-btn px-3 py-1.5 text-sm rounded-md transition-all" data-days="90">90天</button>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm text-muted-foreground">用户筛选：</span>
-                        <select id="sentiment-target-filter" onchange="filterSentimentByTarget()" class="px-3 py-1.5 text-sm rounded-lg border bg-background">
-                            <option value="">所有用户</option>
-                        </select>
-                    </div>
+            <div class="p-6 space-y-4">
+                <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <p class="text-sm text-amber-700 dark:text-amber-300">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        选择要清理的任务类型。这将删除任务记录，但不会影响已归档的数据。
+                    </p>
                 </div>
-
-                <!-- 汇总卡片 -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-blue-100 text-xs">总回复数</p>
-                                <p class="text-2xl font-bold mt-1" id="summary-total">-</p>
-                            </div>
-                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                <i class="fas fa-comments text-lg"></i>
-                            </div>
+                
+                <div class="space-y-3">
+                    <label class="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-all">
+                        <input type="checkbox" id="cleanup-running-tasks" class="w-4 h-4 rounded text-amber-500">
+                        <div class="flex-1">
+                            <p class="font-medium">执行中的任务</p>
+                            <p class="text-xs text-muted-foreground">清理状态为 running 的任务</p>
                         </div>
-                    </div>
-                    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-green-100 text-xs">已分析</p>
-                                <p class="text-2xl font-bold mt-1" id="summary-analyzed">-</p>
-                            </div>
-                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                <i class="fas fa-brain text-lg"></i>
-                            </div>
+                    </label>
+                    
+                    <label class="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-all">
+                        <input type="checkbox" id="cleanup-completed-tasks" class="w-4 h-4 rounded text-green-500">
+                        <div class="flex-1">
+                            <p class="font-medium">执行完成的任务</p>
+                            <p class="text-xs text-muted-foreground">清理状态为 completed 的任务</p>
                         </div>
-                    </div>
-                    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-purple-100 text-xs">平均情绪</p>
-                                <p class="text-2xl font-bold mt-1" id="summary-sentiment">-</p>
-                            </div>
-                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                <i class="fas fa-smile text-lg"></i>
-                            </div>
+                    </label>
+                    
+                    <label class="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-all">
+                        <input type="checkbox" id="cleanup-failed-tasks" class="w-4 h-4 rounded text-red-500">
+                        <div class="flex-1">
+                            <p class="font-medium">失败的任务</p>
+                            <p class="text-xs text-muted-foreground">清理状态为 failed 的任务</p>
                         </div>
-                    </div>
-                    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <p class="text-orange-100 text-xs">最活跃日</p>
-                                <p class="text-sm font-bold mt-1" id="summary-active">-</p>
-                            </div>
-                            <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                <i class="fas fa-calendar-day text-lg"></i>
-                            </div>
-                        </div>
-                    </div>
+                    </label>
                 </div>
-
-                <!-- 标签页导航 -->
-                <div class="flex items-center gap-1 bg-muted rounded-lg p-1 mb-6 w-fit">
-                    <button onclick="switchSentimentTab('trend')" id="tab-trend" class="sentiment-tab px-4 py-2 text-sm rounded-md bg-background shadow-sm transition-all">
-                        <i class="fas fa-chart-line mr-1"></i>情绪趋势
-                    </button>
-                    <button onclick="switchSentimentTab('cycle')" id="tab-cycle" class="sentiment-tab px-4 py-2 text-sm rounded-md transition-all text-muted-foreground hover:text-foreground">
-                        <i class="fas fa-wave-square mr-1"></i>周期指数
+                
+                <div id="task-cleanup-preview" class="hidden p-3 rounded-lg bg-muted/50 text-sm">
+                    <p><i class="fas fa-spinner fa-spin mr-2"></i>正在统计...</p>
+                </div>
+            </div>
+            
+            <div class="p-6 border-t flex gap-3">
+                <button onclick="previewTasksToCleanup()" class="flex-1 px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-all">
+                    <i class="fas fa-eye mr-2"></i>预览
+                </button>
+                <button onclick="executeTaskCleanup()" class="flex-1 px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg hover:shadow-lg transition-all">
+                    <i class="fas fa-broom mr-2"></i>清理
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 归档进度悬浮面板 -->
+    <div id="archive-progress-modal" class="hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-card rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
+            <div class="p-6 border-b bg-gradient-to-r from-blue-500/10 to-indigo-500/10">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold flex items-center gap-2">
+                        <i class="fas fa-archive text-blue-500"></i>
+                        归档进度
+                    </h3>
+                    <button onclick="closeArchiveProgressModal()" class="p-2 rounded-lg hover:bg-muted transition-all">
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
-
-                <!-- 情绪趋势图 -->
-                <div id="panel-trend" class="sentiment-panel-content">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                        <div class="lg:col-span-2 bg-card rounded-2xl p-6 shadow-sm border">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="font-semibold">
-                                    <i class="fas fa-chart-line text-primary mr-2"></i>情绪趋势
-                                </h3>
-                                <div class="flex items-center gap-2 text-xs">
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span>乐观</span>
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span>中性</span>
-                                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span>悲观</span>
-                                </div>
-                            </div>
-                            <div id="sentiment-chart" style="height: 350px;"></div>
+            </div>
+            
+            <div class="p-6 space-y-4">
+                <div id="archive-progress-info">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm text-muted-foreground">正在归档</span>
+                        <span id="archive-progress-status" class="text-sm font-medium">准备中...</span>
+                    </div>
+                    
+                    <!-- 页数进度 -->
+                    <div class="mb-4">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-xs text-muted-foreground">页面进度</span>
+                            <span id="archive-pages-text" class="text-xs font-medium">0/0 页</span>
                         </div>
-                        
-                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
-                            <h3 class="font-semibold mb-4">
-                                <i class="fas fa-pie-chart text-primary mr-2"></i>情绪分布
-                            </h3>
-                            <div id="distribution-chart" style="height: 350px;"></div>
+                        <div class="h-2 rounded-full bg-muted overflow-hidden">
+                            <div id="archive-pages-bar" class="h-full bg-blue-500 transition-all duration-300" style="width: 0%"></div>
                         </div>
                     </div>
-
-                    <!-- 活跃度热力图和关键词 -->
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
-                            <h3 class="font-semibold mb-4">
-                                <i class="fas fa-fire text-primary mr-2"></i>活跃度热力图
-                            </h3>
-                            <div id="heatmap-chart" style="height: 300px;"></div>
+                    
+                    <!-- 回复数 -->
+                    <div class="grid grid-cols-3 gap-3 mb-4">
+                        <div class="p-3 rounded-lg bg-muted/50 text-center">
+                            <p class="text-xs text-muted-foreground">已抓取</p>
+                            <p id="archive-total-replies" class="text-lg font-semibold">0</p>
                         </div>
-                        
-                        <div class="bg-card rounded-2xl p-6 shadow-sm border">
-                            <h3 class="font-semibold mb-4">
-                                <i class="fas fa-tags text-primary mr-2"></i>关键词情绪排行
-                            </h3>
-                            <div id="keywords-chart" style="height: 300px;"></div>
+                        <div class="p-3 rounded-lg bg-green-50 text-center">
+                            <p class="text-xs text-muted-foreground">已存档</p>
+                            <p id="archive-new-count" class="text-lg font-semibold text-green-600">0</p>
+                        </div>
+                        <div class="p-3 rounded-lg bg-amber-50 text-center">
+                            <p class="text-xs text-muted-foreground">跳过</p>
+                            <p id="archive-skip-count" class="text-lg font-semibold text-amber-600">0</p>
+                        </div>
+                    </div>
+                    
+                    <!-- 详细日志 -->
+                    <div class="border rounded-lg overflow-hidden">
+                        <div class="px-3 py-2 bg-muted/30 border-b text-xs font-medium text-muted-foreground flex items-center gap-2">
+                            <i class="fas fa-terminal"></i>
+                            详细日志
+                        </div>
+                        <div id="archive-log-content" class="p-2 h-32 overflow-y-auto font-mono text-xs bg-muted/10">
+                            <div class="text-muted-foreground">等待开始...</div>
                         </div>
                     </div>
                 </div>
-
-                <!-- 周期指数面板 -->
-                <div id="panel-cycle" class="sentiment-panel-content hidden">
-                    <div class="bg-card rounded-2xl p-6 shadow-sm border mb-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="font-semibold">
-                                <i class="fas fa-wave-square text-primary mr-2"></i>情绪周期指数 (0-100)
-                            </h3>
-                            <div class="flex items-center gap-3 text-xs">
-                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-red-500"></span>悲观区(&lt;30)</span>
-                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-yellow-400"></span>中性区(30-70)</span>
-                                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded bg-green-500"></span>乐观区(&gt;70)</span>
-                                <span class="flex items-center gap-1"><span class="w-4 h-0.5 bg-orange-500"></span>MA7均线</span>
-                            </div>
-                        </div>
-                        <div id="cycle-chart" style="height: 400px;"></div>
-                    </div>
-
-                    <!-- 周期统计卡片 -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 text-white shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-blue-100 text-xs">当前指数</p>
-                                    <p class="text-2xl font-bold mt-1" id="cycle-current">-</p>
-                                </div>
-                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <i class="fas fa-tachometer-alt text-lg"></i>
-                                </div>
-                            </div>
-                            <p class="text-blue-100 text-xs mt-2" id="cycle-phase">阶段: -</p>
-                        </div>
-                        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-4 text-white shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-green-100 text-xs">7日均值</p>
-                                    <p class="text-2xl font-bold mt-1" id="cycle-ma7">-</p>
-                                </div>
-                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <i class="fas fa-chart-line text-lg"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-4 text-white shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-purple-100 text-xs">最高指数</p>
-                                    <p class="text-2xl font-bold mt-1" id="cycle-max">-</p>
-                                </div>
-                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <i class="fas fa-arrow-up text-lg"></i>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-4 text-white shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-orange-100 text-xs">最低指数</p>
-                                    <p class="text-2xl font-bold mt-1" id="cycle-min">-</p>
-                                </div>
-                                <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-                                    <i class="fas fa-arrow-down text-lg"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+                
+                <div id="archive-progress-complete" class="hidden text-center py-4">
+                    <i class="fas fa-check-circle text-4xl text-green-500 mb-3"></i>
+                    <p class="font-medium">归档完成！</p>
+                    <p id="archive-complete-stats" class="text-sm text-muted-foreground mt-1"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
 </body>
 </html>

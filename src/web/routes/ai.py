@@ -369,3 +369,104 @@ async def analyze_sentiment_cycle(
         import logging
         logging.error(f"[SentimentCycle] 情绪周期分析失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"分析失败: {str(e)}")
+
+
+@router.post("/daily-sentiment/{target_id}")
+async def analyze_daily_sentiment_endpoint(
+    target_id: int,
+    background_tasks: BackgroundTasks,
+    days: int = Query(default=30, ge=7, le=90),
+    db: Session = Depends(get_db)
+):
+    """
+    分析每日情绪指数 - 后台任务
+    
+    Args:
+        target_id: 监控目标 ID
+        days: 分析天数 (7-90)
+        
+    Returns:
+        启动状态
+    """
+    # 检查用户是否存在
+    target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="目标不存在")
+    
+    # 检查AI配置
+    from db.models import Config
+    ai_config = Config.get_ai_config(db)
+    if not ai_config.get('api_key'):
+        raise HTTPException(status_code=400, detail="AI API Key 未配置")
+    
+    # 启动后台任务
+    background_tasks.add_task(_run_daily_sentiment_analysis, target_id, days)
+    
+    return {
+        "success": True,
+        "message": f"已开始分析 {target.name} 的每日情绪 ({days}天)",
+        "target_id": target_id,
+        "days": days
+    }
+
+
+async def _run_daily_sentiment_analysis(target_id: int, days: int):
+    """后台任务：运行每日情绪分析"""
+    from ai_analyzer import analyze_daily_sentiment
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"[后台任务] 开始每日情绪分析: target_id={target_id}, days={days}")
+    
+    try:
+        result = await analyze_daily_sentiment(target_id, days)
+        if result:
+            logger.info(f"[后台任务] 每日情绪分析完成: {result['days_analyzed']} 天")
+        else:
+            logger.warning("[后台任务] 每日情绪分析返回空结果")
+    except Exception as e:
+        logger.error(f"[后台任务] 每日情绪分析失败: {e}", exc_info=True)
+
+
+@router.get("/daily-sentiment/{target_id}/status")
+async def get_daily_sentiment_status(
+    target_id: int,
+    days: int = Query(default=30, ge=7, le=90),
+    db: Session = Depends(get_db)
+):
+    """
+    获取每日情绪分析结果
+    
+    Args:
+        target_id: 监控目标 ID
+        days: 查询天数
+        
+    Returns:
+        每日情绪数据列表
+    """
+    from db.models import SentimentAnalysis, MonitorTarget
+    from datetime import datetime, timedelta
+    
+    # 检查用户是否存在
+    target = db.query(MonitorTarget).filter(MonitorTarget.id == target_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="目标不存在")
+    
+    # 计算日期范围
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    
+    # 查询已有的情绪分析数据
+    records = db.query(SentimentAnalysis).filter(
+        SentimentAnalysis.target_id == target_id,
+        SentimentAnalysis.date >= start_date.strftime('%Y-%m-%d'),
+        SentimentAnalysis.date <= end_date.strftime('%Y-%m-%d')
+    ).order_by(SentimentAnalysis.date.asc()).all()
+    
+    return {
+        "target_id": target_id,
+        "target_name": target.name,
+        "days_requested": days,
+        "days_analyzed": len(records),
+        "data": [r.to_dict() for r in records]
+    }

@@ -96,9 +96,24 @@ class BrowserPool:
         logger.info(f"[BrowserPool] 创建新 context: {key}")
         
         import json
+        storage_state = {}
         try:
-            with open(storage_state_path, "r") as f:
-                storage_state = json.load(f)
+            # 使用 aiofiles 异步读取文件 (优化: 避免阻塞事件循环)
+            import aiofiles
+            async with aiofiles.open(storage_state_path, "r") as f:
+                content = await f.read()
+                storage_state = json.loads(content)
+            logger.debug(f"[BrowserPool] 异步读取 storage state: {storage_state_path}")
+        except ImportError:
+            # 如果没有 aiofiles, 使用线程池执行同步读取
+            import asyncio
+            loop = asyncio.get_event_loop()
+            try:
+                with open(storage_state_path, "r") as f:
+                    storage_state = await loop.run_in_executor(None, json.load, f)
+            except Exception as e:
+                logger.error(f"[BrowserPool] 读取 storage state 失败: {e}")
+                storage_state = {}
         except Exception as e:
             logger.error(f"[BrowserPool] 读取 storage state 失败: {e}")
             storage_state = {}

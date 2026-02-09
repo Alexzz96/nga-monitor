@@ -127,7 +127,7 @@
                     <p class="text-xs text-muted-foreground">智能监控与 AI 分析系统</p>
                 </div>
             </div>
-            
+
             <div class="flex items-center gap-2">
                 <a href="/" class="nav-btn active px-4 py-2 rounded-lg text-sm font-medium transition-all bg-primary text-primary-foreground shadow-md">
                     <i class="fas fa-satellite-dish mr-2"></i>监控
@@ -137,6 +137,7 @@
                 </a>
                 <a href="/data" class="nav-btn px-4 py-2 rounded-lg text-sm font-medium transition-all text-muted-foreground hover:bg-secondary hover:text-secondary-foreground">
                     <i class="fas fa-database mr-2"></i>数据
+                </a>
                 </a>
             </div>
         </div>
@@ -153,7 +154,7 @@
     <div id="sentiment-modal" class="fixed inset-0 z-50 hidden">
         <!-- 背景遮罩 -->
         <div class="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity" onclick="closeSentimentModal()"></div>
-        
+
         <!-- 面板内容 -->
         <div class="absolute right-0 top-0 h-full w-full max-w-5xl bg-background shadow-2xl transform transition-transform translate-x-full" id="sentiment-panel">
             <!-- 面板头部 -->
@@ -177,7 +178,7 @@
                     </button>
                 </div>
             </div>
-            
+
             <!-- 面板主体 -->
             <div class="p-6 overflow-y-auto h-[calc(100vh-80px)]">
                 <!-- 时间范围选择 -->
@@ -273,7 +274,7 @@
                             </div>
                             <div id="sentiment-chart" style="height: 350px;"></div>
                         </div>
-                        
+
                         <div class="bg-card rounded-2xl p-6 shadow-sm border">
                             <h3 class="font-semibold mb-4">
                                 <i class="fas fa-pie-chart text-primary mr-2"></i>情绪分布
@@ -290,7 +291,7 @@
                             </h3>
                             <div id="heatmap-chart" style="height: 300px;"></div>
                         </div>
-                        
+
                         <div class="bg-card rounded-2xl p-6 shadow-sm border">
                             <h3 class="font-semibold mb-4">
                                 <i class="fas fa-tags text-primary mr-2"></i>关键词情绪排行
@@ -417,7 +418,7 @@
                                 <i class="fas fa-bullseye text-primary"></i>
                                 监控目标
                             </h2>
-                            <button onclick="document.getElementById('add-target-section').scrollIntoView({behavior: 'smooth'})" 
+                            <button onclick="document.getElementById('add-target-section').scrollIntoView({behavior: 'smooth'})"
                                     class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-md hover:shadow-lg">
                                 <i class="fas fa-plus"></i>
                                 添加目标
@@ -456,7 +457,7 @@
                         <div id="schedule-status" class="mb-6 p-4 rounded-xl bg-muted/50 border">
                             <p class="text-muted-foreground">加载中...</p>
                         </div>
-                        
+
                         <div class="overflow-x-auto">
                             <table class="w-full mb-6">
                                 <thead>
@@ -478,7 +479,7 @@
                             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                                 <div class="space-y-2">
                                     <label class="text-sm font-medium">规则名称</label>
-                                    <input type="text" id="rule-name" placeholder="如：夜间模式" 
+                                    <input type="text" id="rule-name" placeholder="如：夜间模式"
                                            class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                                 </div>
                                 <div class="space-y-2">
@@ -498,7 +499,7 @@
                                 </div>
                                 <div class="space-y-2">
                                     <label class="text-sm font-medium">总结模式</label>
-                                    <select id="rule-summary" 
+                                    <select id="rule-summary"
                                             class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                                         <option value="false">否</option>
                                         <option value="true">是</option>
@@ -510,7 +511,7 @@
                                            class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                                 </div>
                             </div>
-                            <button onclick="addScheduleRule()" 
+                            <button onclick="addScheduleRule()"
                                     class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-md">
                                 <i class="fas fa-plus"></i>
                                 添加规则
@@ -535,11 +536,11 @@
                                     <option value="WARNING">WARNING</option>
                                     <option value="ERROR">ERROR</option>
                                 </select>
-                                <button onclick="loadLogs()" 
+                                <button onclick="loadLogs()"
                                         class="p-2 rounded-lg border hover:bg-muted transition-all" title="刷新">
                                     <i class="fas fa-sync-alt"></i>
                                 </button>
-                                <button onclick="cleanupLogs()" 
+                                <button onclick="cleanupLogs()"
                                         class="px-3 py-2 rounded-lg border text-destructive hover:bg-destructive/10 transition-all text-sm">
                                     <i class="fas fa-trash-alt mr-1"></i>清理
                                 </button>
@@ -597,21 +598,21 @@
                         </h2>
                     </div>
                     <div class="p-6 space-y-4">
-                        <div class="p-3 rounded-lg bg-muted/50 border text-sm break-all">
-                            <span class="text-muted-foreground">当前:</span>
-                            <span id="current-webhook" class="ml-2">{{ webhook }}</span>
+                        <!-- Webhook 列表 -->
+                        <div id="webhook-list" class="space-y-2">
+                            <!-- 动态加载 -->
                         </div>
-                        <div class="space-y-2">
-                            <input type="url" id="webhook-url" placeholder="https://discord.com/api/webhooks/..." 
+                        
+                        <!-- 添加新 Webhook -->
+                        <div class="pt-4 border-t space-y-2">
+                            <input type="text" id="webhook-name" placeholder="名称 (如: 主频道)"
+                                   class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <input type="url" id="webhook-url" placeholder="ID 或完整 URL"
                                    class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                             <div class="flex gap-2">
-                                <button onclick="updateWebhook()" 
+                                <button onclick="addWebhook()"
                                         class="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all">
-                                    更新
-                                </button>
-                                <button onclick="testWebhook()" 
-                                        class="px-4 py-2 border rounded-lg text-sm font-medium hover:bg-muted transition-all">
-                                    测试
+                                    添加
                                 </button>
                             </div>
                         </div>
@@ -630,15 +631,15 @@
                         <div class="space-y-2">
                             <label class="text-sm font-medium">NGA 用户链接</label>
                             <div class="flex gap-2">
-                                <input type="url" id="parse-url" placeholder="https://nga.178.com/nuke.php?func=ucp&uid=..." 
+                                <input type="url" id="parse-url" placeholder="https://nga.178.com/nuke.php?func=ucp&uid=..."
                                        class="flex-1 px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                                <button onclick="parseUrl()" 
+                                <button onclick="parseUrl()"
                                         class="px-3 py-2 bg-secondary text-secondary-foreground rounded-lg text-sm hover:bg-secondary/80 transition-all">
                                     解析
                                 </button>
                             </div>
                         </div>
-                        
+
                         <div class="relative">
                             <div class="absolute inset-0 flex items-center">
                                 <span class="w-full border-t"></span>
@@ -647,40 +648,29 @@
                                 <span class="bg-card px-2 text-muted-foreground">或手动输入</span>
                             </div>
                         </div>
-                        
+
                         <div class="space-y-3">
                             <div>
                                 <label class="text-sm font-medium">UID</label>
-                                <input type="text" id="new-uid" placeholder="例如: 557398" 
+                                <input type="text" id="new-uid" placeholder="例如: 557398"
                                        class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mt-1">
                             </div>
                             <div>
                                 <label class="text-sm font-medium">名称（可选）</label>
-                                <input type="text" id="new-name" placeholder="显示名称" 
+                                <input type="text" id="new-name" placeholder="显示名称"
                                        class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mt-1">
                             </div>
                             <div>
                                 <label class="text-sm font-medium">检查间隔（秒）</label>
-                                <input type="number" id="new-interval" value="60" min="10" 
+                                <input type="number" id="new-interval" value="60" min="10"
                                        class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mt-1">
                             </div>
                             <div>
-                                <label class="text-sm font-medium flex items-center gap-1">
-                                    <i class="fas fa-filter text-muted-foreground"></i>
-                                    关键词过滤
-                                </label>
-                                <input type="text" id="new-keywords" placeholder="股票,基金,比特币（逗号分隔，留空不过滤）" 
-                                       class="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all mt-1">
-                                <select id="new-keyword-mode" class="w-full mt-2 px-3 py-2 rounded-lg border bg-background text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                                    <option value="ANY">匹配任一关键词</option>
-                                    <option value="ALL">匹配全部关键词</option>
-                                    <option value="REGEX">正则表达式</option>
-                                </select>
+                                <button onclick="addTarget()"
+                                        class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-md">
+                                    <i class="fas fa-plus mr-2"></i>添加监控
+                                </button>
                             </div>
-                            <button onclick="addTarget()" 
-                                    class="w-full px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-all shadow-md">
-                                <i class="fas fa-plus mr-2"></i>添加监控
-                            </button>
                         </div>
                     </div>
                 </section>
@@ -789,14 +779,6 @@
                 const data = await res.json();
                 const tbody = document.getElementById('targets-table');
                 tbody.innerHTML = data.targets.map(t => {
-                    const hasKeywords = t.keywords && t.keywords.trim();
-                    const keywordsBadge = hasKeywords 
-                        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 ml-2" title="${t.keywords}">
-                             <i class="fas fa-filter text-[10px]"></i>
-                             ${t.keyword_mode === 'REGEX' ? '正则' : t.keyword_mode === 'ALL' ? '全部' : '任一'}
-                           </span>`
-                        : '';
-                    
                     return `
                     <tr class="border-b hover:bg-muted/50 transition-colors">
                         <td class="py-4 px-4">
@@ -807,10 +789,8 @@
                                 <div>
                                     <div class="flex items-center">
                                         <p class="font-medium">${t.name || '-'}</p>
-                                        ${keywordsBadge}
                                     </div>
                                     <p class="text-xs text-muted-foreground">UID: ${t.uid}</p>
-                                    ${hasKeywords ? `<p class="text-xs text-muted-foreground mt-0.5 truncate max-w-[200px]" title="${t.keywords}">${t.keywords}</p>` : ''}
                                 </div>
                             </div>
                         </td>
@@ -851,7 +831,7 @@
                 const res = await fetch('/api/cookie-status');
                 const data = await res.json();
                 const container = document.getElementById('cookie-status');
-                
+
                 if (!data.exists) {
                     container.innerHTML = `
                         <div class="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400">
@@ -944,7 +924,7 @@
                 const res = await fetch('/api/schedule/status');
                 const data = await res.json();
                 const container = document.getElementById('schedule-status');
-                
+
                 container.innerHTML = `
                     <div class="flex items-center gap-4 flex-wrap">
                         <div class="flex items-center gap-2">
@@ -972,13 +952,13 @@
                 const res = await fetch(url);
                 const data = await res.json();
                 const tbody = document.getElementById('logs-table');
-                
+
                 const levelColors = {
                     'ERROR': 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
                     'WARNING': 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
                     'DEBUG': 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
                 };
-                
+
                 tbody.innerHTML = data.logs.slice(0, 50).map(l => `
                     <tr class="border-b hover:bg-muted/30 transition-colors ${levelColors[l.level] || ''}">
                         <td class="py-2 px-3 text-xs text-muted-foreground whitespace-nowrap">${formatTime(l.created_at)}</td>
@@ -1002,14 +982,14 @@
                 showAlert('请输入 URL', 'error');
                 return;
             }
-            
+
             try {
                 const res = await fetch('/api/parse-url', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({url})
                 });
-                
+
                 if (res.ok) {
                     const data = await res.json();
                     document.getElementById('new-uid').value = data.uid;
@@ -1034,32 +1014,27 @@
             const uid = document.getElementById('new-uid').value.trim();
             const name = document.getElementById('new-name').value.trim();
             const interval = parseInt(document.getElementById('new-interval').value) || 60;
-            const keywords = document.getElementById('new-keywords').value.trim();
-            const keywordMode = document.getElementById('new-keyword-mode').value;
-            
+
             if (!uid) {
                 showAlert('请输入 UID', 'error');
                 return;
             }
-            
+
             try {
                 const res = await fetch('/api/targets', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        uid, 
-                        name, 
-                        check_interval: interval,
-                        keywords,
-                        keyword_mode: keywordMode
+                        uid,
+                        name,
+                        check_interval: interval
                     })
                 });
-                
+
                 if (res.ok) {
                     showAlert('添加成功');
                     document.getElementById('new-uid').value = '';
                     document.getElementById('new-name').value = '';
-                    document.getElementById('new-keywords').value = '';
                     loadTargets();
                     loadStats();
                 } else {
@@ -1079,7 +1054,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({enabled})
                 });
-                
+
                 if (res.ok) {
                     showAlert(enabled ? '已启用' : '已禁用');
                     loadTargets();
@@ -1092,7 +1067,7 @@
 
         async function deleteTarget(id) {
             if (!confirm('确定要删除吗？')) return;
-            
+
             try {
                 const res = await fetch(`/api/targets/${id}`, {method: 'DELETE'});
                 if (res.ok) {
@@ -1145,28 +1120,142 @@
                 showAlert('请输入 URL', 'error');
                 return;
             }
-            
+
             try {
                 const res = await fetch('/api/webhook', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({url})
                 });
-                
+
                 if (res.ok) {
+                    const data = await res.json();
+                    const displayUrl = data.webhook || url;
                     showAlert('Webhook 已更新');
-                    document.getElementById('current-webhook').textContent = url.substring(0, 30) + '...';
+                    document.getElementById('current-webhook').textContent = displayUrl.substring(0, 30) + '...';
                     document.getElementById('webhook-url').value = '';
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '更新失败', 'error');
                 }
             } catch (e) {
                 showAlert('更新失败', 'error');
             }
         }
 
+        async function loadWebhooks() {
+            try {
+                const res = await fetch('/api/webhooks/');
+                const data = await res.json();
+                const listEl = document.getElementById('webhook-list');
+                
+                if (data.webhooks.length === 0) {
+                    listEl.innerHTML = '<p class="text-sm text-muted-foreground text-center py-4">暂无 Webhook</p>';
+                    return;
+                }
+                
+                listEl.innerHTML = data.webhooks.map(w => `
+                    <div class="flex items-center justify-between p-3 rounded-lg border ${w.is_default ? 'bg-primary/5 border-primary/20' : 'bg-muted/30'}" data-id="${w.id}">
+                        <div class="flex items-center gap-3 min-w-0">
+                            <input type="radio" name="default-webhook" ${w.is_default ? 'checked' : ''} 
+                                   onchange="setDefaultWebhook(${w.id})"
+                                   class="w-4 h-4 text-primary">
+                            <div class="min-w-0">
+                                <div class="font-medium text-sm truncate">${w.name}</div>
+                                <div class="text-xs text-muted-foreground truncate">${w.url}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="testWebhookById(${w.id})" class="p-1.5 text-muted-foreground hover:text-primary transition-colors" title="测试">
+                                <i class="fas fa-paper-plane text-xs"></i>
+                            </button>
+                            <button onclick="deleteWebhook(${w.id})" class="p-1.5 text-muted-foreground hover:text-destructive transition-colors" title="删除">
+                                <i class="fas fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('加载 Webhook 失败:', e);
+            }
+        }
+
+        async function addWebhook() {
+            const name = document.getElementById('webhook-name').value.trim();
+            const url = document.getElementById('webhook-url').value.trim();
+            
+            if (!name || !url) {
+                showAlert('请输入名称和 URL', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/webhooks/', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, url, is_default: true})
+                });
+                
+                if (res.ok) {
+                    showAlert('Webhook 已添加');
+                    document.getElementById('webhook-name').value = '';
+                    document.getElementById('webhook-url').value = '';
+                    loadWebhooks();
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '添加失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+
+        async function setDefaultWebhook(id) {
+            try {
+                await fetch(`/api/webhooks/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({is_default: true})
+                });
+                loadWebhooks();
+            } catch (e) {
+                console.error('设置默认失败:', e);
+            }
+        }
+
+        async function deleteWebhook(id) {
+            if (!confirm('确定删除此 Webhook?')) return;
+            
+            try {
+                const res = await fetch(`/api/webhooks/${id}`, {method: 'DELETE'});
+                if (res.ok) {
+                    showAlert('已删除');
+                    loadWebhooks();
+                }
+            } catch (e) {
+                showAlert('删除失败', 'error');
+            }
+        }
+
+        async function testWebhookById(id) {
+            try {
+                showAlert('正在测试...', 'warning');
+                const res = await fetch(`/api/webhooks/${id}/test`, {method: 'POST'});
+                if (res.ok) {
+                    showAlert('测试消息已发送');
+                } else {
+                    const err = await res.json();
+                    showAlert(err.detail || '测试失败', 'error');
+                }
+            } catch (e) {
+                showAlert('请求失败', 'error');
+            }
+        }
+
         async function testWebhook() {
             try {
                 showAlert('正在测试...', 'warning');
-                const res = await fetch('/api/webhook/test', {method: 'POST'});
+                const res = await fetch('/api/webhooks/test-default', {method: 'POST'});
                 if (res.ok) {
                     showAlert('测试消息已发送');
                 } else {
@@ -1179,7 +1268,7 @@
 
         async function cleanupLogs() {
             if (!confirm('确定清理 7 天前的日志？')) return;
-            
+
             try {
                 const res = await fetch('/api/logs/cleanup', {method: 'POST'});
                 if (res.ok) {
@@ -1199,12 +1288,12 @@
             const interval = parseInt(document.getElementById('rule-interval').value) || 60;
             const isSummary = document.getElementById('rule-summary').value === 'true';
             const priority = parseInt(document.getElementById('rule-priority').value) || 0;
-            
+
             if (!name || !startTime || !endTime) {
                 showAlert('请填写完整信息', 'error');
                 return;
             }
-            
+
             try {
                 const res = await fetch('/api/schedule/rules', {
                     method: 'POST',
@@ -1215,7 +1304,7 @@
                         priority, enabled: true
                     })
                 });
-                
+
                 if (res.ok) {
                     showAlert('规则添加成功');
                     document.getElementById('rule-name').value = '';
@@ -1239,7 +1328,7 @@
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({enabled})
                 });
-                
+
                 if (res.ok) {
                     showAlert(enabled ? '规则已启用' : '规则已禁用');
                     loadScheduleRules();
@@ -1252,7 +1341,7 @@
 
         async function deleteScheduleRule(id) {
             if (!confirm('确定要删除吗？')) return;
-            
+
             try {
                 const res = await fetch(`/api/schedule/rules/${id}`, {method: 'DELETE'});
                 if (res.ok) {
@@ -1269,6 +1358,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
             loadTargets();
+            loadWebhooks();
             loadCookieStatus();
             loadScheduleRules();
             loadScheduleStatus();
@@ -1293,7 +1383,7 @@
             // 触发重排以启动动画
             void panel.offsetWidth;
             panel.classList.remove('translate-x-full');
-            
+
             // 初始化图表
             if (!sentimentChart) {
                 initSentimentCharts();
@@ -1332,7 +1422,7 @@
                 const res = await fetch('/api/targets');
                 const data = await res.json();
                 const select = document.getElementById('sentiment-target-filter');
-                
+
                 data.targets.forEach(t => {
                     const option = document.createElement('option');
                     option.value = t.id;
@@ -1388,7 +1478,7 @@
                 const keywords = await keywordsRes.json();
                 updateKeywordsChart(keywords);
 
-                document.getElementById('last-update').textContent = 
+                document.getElementById('last-update').textContent =
                     '更新于: ' + new Date().toLocaleTimeString('zh-CN');
             } catch (e) {
                 console.error('刷新情绪数据失败:', e);
@@ -1398,13 +1488,13 @@
         function updateSentimentSummary(data) {
             document.getElementById('summary-total').textContent = data.total_replies || 0;
             document.getElementById('summary-analyzed').textContent = data.analyzed_replies || 0;
-            
+
             const sentiment = data.avg_sentiment || 0;
             const sentimentEl = document.getElementById('summary-sentiment');
             sentimentEl.textContent = sentiment > 0 ? `+${sentiment.toFixed(2)}` : sentiment.toFixed(2);
-            sentimentEl.className = 'text-2xl font-bold mt-1 ' + 
+            sentimentEl.className = 'text-2xl font-bold mt-1 ' +
                 (sentiment > 0.2 ? 'text-green-200' : sentiment < -0.2 ? 'text-red-200' : '');
-            
+
             document.getElementById('summary-active').textContent = data.most_active_day || '-';
         }
 
@@ -1528,7 +1618,7 @@
 
         function updateKeywordsChart(data) {
             const words = data.keywords.slice(0, 10);
-            
+
             const option = {
                 tooltip: {
                     trigger: 'axis',
@@ -1557,7 +1647,7 @@
                         count: w.count,
                         sentiment: w.avg_sentiment,
                         itemStyle: {
-                            color: w.avg_sentiment > 0.2 ? '#22c55e' : 
+                            color: w.avg_sentiment > 0.2 ? '#22c55e' :
                                    w.avg_sentiment < -0.2 ? '#ef4444' : '#9ca3af'
                         }
                     })).reverse(),
@@ -1582,7 +1672,7 @@
         // 切换情绪趋势标签页
         function switchSentimentTab(tab) {
             currentSentimentTab = tab;
-            
+
             // 更新按钮样式
             document.querySelectorAll('.sentiment-tab').forEach(btn => {
                 btn.classList.remove('bg-background', 'shadow-sm');
@@ -1590,13 +1680,13 @@
             });
             document.getElementById(`tab-${tab}`).classList.add('bg-background', 'shadow-sm');
             document.getElementById(`tab-${tab}`).classList.remove('text-muted-foreground');
-            
+
             // 切换面板显示
             document.querySelectorAll('.sentiment-panel-content').forEach(panel => {
                 panel.classList.add('hidden');
             });
             document.getElementById(`panel-${tab}`).classList.remove('hidden');
-            
+
             // 如果切换到周期指数，刷新数据
             if (tab === 'cycle') {
                 refreshCycleData();
@@ -1620,7 +1710,7 @@
             // 过滤掉无数据点用于连线
             const validIndices = data.index.map((val, idx) => val !== null ? [data.dates[idx], val] : null).filter(x => x);
             const validMA7 = data.ma7.map((val, idx) => val !== null ? [data.dates[idx], val] : null).filter(x => x);
-            
+
             const option = {
                 tooltip: {
                     trigger: 'axis',
@@ -1723,16 +1813,16 @@
         function updateCycleStats(data) {
             const validIndices = data.index.filter(x => x !== null);
             const validMA7 = data.ma7.filter(x => x !== null);
-            
+
             if (validIndices.length > 0) {
                 const current = validIndices[validIndices.length - 1];
                 const ma7 = validMA7[validMA7.length - 1];
                 const max = Math.max(...validIndices);
                 const min = Math.min(...validIndices);
-                
+
                 const lastIdx = data.index.length - 1;
                 const phase = data.phases[lastIdx] || '-';
-                
+
                 document.getElementById('cycle-current').textContent = current.toFixed(1);
                 document.getElementById('cycle-phase').textContent = `阶段: ${phase}`;
                 document.getElementById('cycle-ma7').textContent = ma7 ? ma7.toFixed(1) : '-';

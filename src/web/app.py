@@ -45,10 +45,10 @@ from web.routes.utils import get_cookie_status
 app.get("/api/cookie-status")(get_cookie_status)
 
 # 向后兼容：Webhook 端点别名
-from web.routes.webhook import get_webhook, update_webhook, test_webhook
-app.get("/api/webhook")(get_webhook)
-app.post("/api/webhook")(update_webhook)
-app.post("/api/webhook/test")(test_webhook)
+from web.routes.webhook import get_webhook_compat, update_webhook_compat, test_webhook_compat
+app.get("/api/webhook")(get_webhook_compat)
+app.post("/api/webhook")(update_webhook_compat)
+app.post("/api/webhook/test")(test_webhook_compat)
 
 STORAGE_STATE_PATH = Path(os.getenv('STORAGE_STATE_PATH', '/app/data/storage_state.json'))
 

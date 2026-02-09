@@ -35,8 +35,6 @@ class MonitorTarget(Base):
             'url': self.url,
             'enabled': self.enabled,
             'check_interval': self.check_interval,
-            'keywords': self.keywords or '',
-            'keyword_mode': self.keyword_mode or 'ANY',
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -298,6 +296,7 @@ class AIAnalysisReport(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
+
 class Config(Base):
     """系统配置"""
     __tablename__ = 'config'
@@ -321,6 +320,40 @@ class Config(Base):
             cfg.value = url
         else:
             cfg = Config(key='discord_webhook', value=url)
+            db.add(cfg)
+        db.commit()
+    
+    @staticmethod
+    def get_webhook_token(db):
+        """获取 webhook token"""
+        cfg = db.query(Config).filter(Config.key == 'discord_webhook_token').first()
+        return cfg.value if cfg else None
+    
+    @staticmethod
+    def set_webhook_token(db, token):
+        """设置 webhook token"""
+        cfg = db.query(Config).filter(Config.key == 'discord_webhook_token').first()
+        if cfg:
+            cfg.value = token
+        else:
+            cfg = Config(key='discord_webhook_token', value=token)
+            db.add(cfg)
+        db.commit()
+    
+    @staticmethod
+    def get_webhook_id(db):
+        """获取 webhook id"""
+        cfg = db.query(Config).filter(Config.key == 'discord_webhook_id').first()
+        return cfg.value if cfg else None
+    
+    @staticmethod
+    def set_webhook_id(db, webhook_id):
+        """设置 webhook id"""
+        cfg = db.query(Config).filter(Config.key == 'discord_webhook_id').first()
+        if cfg:
+            cfg.value = webhook_id
+        else:
+            cfg = Config(key='discord_webhook_id', value=webhook_id)
             db.add(cfg)
         db.commit()
     
@@ -421,6 +454,20 @@ def init_db():
             db.add(day_rule)
             db.commit()
             print(f"✅ 创建默认调度规则: 夜间总结模式 + 日间高频模式")
+        
+        # 启动时清理卡住的任务（上次运行中因重启而中断的任务）
+        try:
+            stuck_tasks = db.query(ArchiveTask).filter(ArchiveTask.status == 'running').all()
+            if stuck_tasks:
+                for task in stuck_tasks:
+                    task.status = 'failed'
+                    task.error_message = '服务重启导致任务中断'
+                    task.completed_at = datetime.now(timezone.utc)
+                db.commit()
+                print(f"✅ 自动清理 {len(stuck_tasks)} 个卡住的任务")
+        except Exception as e:
+            print(f"⚠️ 清理卡住任务失败: {e}")
+        
     finally:
         db.close()
 
@@ -442,3 +489,61 @@ def cleanup_old_logs(days=7):
         return deleted
     finally:
         db.close()
+
+
+class UserStyleProfile(Base):
+    """用户风格档案"""
+    __tablename__ = 'user_style_profiles'
+    
+    id = Column(Integer, primary_key=True)
+    target_id = Column(Integer, ForeignKey('monitor_targets.id'), nullable=False, index=True)
+    time_range = Column(String(20), nullable=False)  # week/month/all
+    personality = Column(Text)
+    investment_style = Column(Text)
+    communication_style = Column(Text)
+    emotional_tendency = Column(String(20))
+    keywords = Column(Text)  # JSON
+    risk_tolerance = Column(String(10))
+    summary = Column(Text)
+    analyzed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    target = relationship("MonitorTarget")
+
+
+class StyleComparison(Base):
+    """风格对比"""
+    __tablename__ = 'style_comparisons'
+
+    id = Column(Integer, primary_key=True)
+    target_ids = Column(Text)  # JSON list
+    time_range = Column(String(20), nullable=False)
+    similarities = Column(Text)
+    differences = Column(Text)
+    style_comparison = Column(Text)  # JSON
+    recommendations = Column(Text)
+    summary = Column(Text)
+    compared_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class Webhook(Base):
+    """Webhook 清单 - 支持多个 webhook"""
+    __tablename__ = 'webhooks'
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)  # 显示名称
+    url = Column(String(500), nullable=False)   # 完整 URL
+    is_default = Column(Boolean, default=False) # 是否为默认
+    enabled = Column(Boolean, default=True)     # 是否启用
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'url': self.url[:50] + '...' if len(self.url) > 50 else self.url,
+            'is_default': self.is_default,
+            'enabled': self.enabled,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
